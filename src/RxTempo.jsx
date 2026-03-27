@@ -2743,8 +2743,9 @@ export default function RxTempo() {
             </div>
 
             {/* Vertically centered content */}
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", padding: "16px 28px" }}>
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between", padding: "24px 28px" }}>
 
+              <div>
               {/* Headline — Rx in blue, Tempo in white, LITE badge */}
               <div style={{ animation: "revealUp 0.5s ease both 0.15s", marginBottom: "24px" }}>
                 <h1 style={{
@@ -2771,7 +2772,7 @@ export default function RxTempo() {
               {/* Rolling hills rhythm wave — full width, dynamic */}
               <div style={{
                 marginLeft: "-28px", marginRight: "-28px",
-                marginBottom: "24px", overflow: "hidden", height: "36px",
+                marginBottom: "24px", overflow: "hidden", height: "48px",
                 animation: "revealUp 0.5s ease both 0.25s",
               }}>
                 <svg width="200%" height="48" viewBox="0 0 600 48" preserveAspectRatio="none" style={{
@@ -2845,10 +2846,11 @@ export default function RxTempo() {
                   <div>Nothing is saved. No data leaves your device.</div>
                 </div>
               </div>
+              </div>
 
               {/* Footer */}
               <div style={{
-                textAlign: "center", marginTop: "auto", paddingTop: "12px",
+                textAlign: "center", paddingTop: "12px",
                 animation: "revealUp 0.5s ease both 0.85s",
               }}>
                 <div style={{
