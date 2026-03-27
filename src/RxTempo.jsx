@@ -2657,7 +2657,7 @@ export default function RxTempo() {
           @keyframes revealScale { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } }
           @keyframes pulseLine { 0%, 100% { opacity: 0.12; } 50% { opacity: 0.25; } }
           @keyframes scrollLine { from { transform: translateX(0); } to { transform: translateX(-50%); } }
-          @keyframes rhythmPulse { 0%, 100% { transform: scaleY(0.6); } 50% { transform: scaleY(1.3); } }
+          @keyframes rhythmPulse { 0%, 100% { transform: scaleY(0.75); } 50% { transform: scaleY(1.15); } }
         `}</style>
 
         {isSetup ? (
@@ -2777,7 +2777,7 @@ export default function RxTempo() {
               }}>
                 <div style={{ width: "200%", animation: "scrollLine 20s linear infinite" }}>
                 <svg width="100%" height="72" viewBox="0 0 750 72" preserveAspectRatio="none" style={{
-                  animation: "rhythmPulse 4s ease-in-out infinite",
+                  animation: "rhythmPulse 7s ease-in-out infinite",
                   transformOrigin: "center center",
                 }}>
                   <defs>
