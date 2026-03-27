@@ -2657,6 +2657,11 @@ export default function RxTempo() {
           @keyframes revealScale { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } }
           @keyframes pulseLine { 0%, 100% { opacity: 0.12; } 50% { opacity: 0.25; } }
           @keyframes scrollLine { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+          @keyframes scrollLine2 { from { transform: translateX(-10%); } to { transform: translateX(-60%); } }
+          @keyframes scrollLine3 { from { transform: translateX(-25%); } to { transform: translateX(-75%); } }
+          @keyframes wavePulse1 { 0%, 100% { opacity: 0.45; } 50% { opacity: 0.25; } }
+          @keyframes wavePulse2 { 0%, 100% { opacity: 0.2; } 50% { opacity: 0.35; } }
+          @keyframes wavePulse3 { 0%, 100% { opacity: 0.15; } 50% { opacity: 0.08; } }
         `}</style>
 
         {isSetup ? (
@@ -2768,22 +2773,49 @@ export default function RxTempo() {
                 </p>
               </div>
 
-              {/* Rolling hills rhythm wave — full width, dynamic */}
+              {/* Rhythm wave — layered, dynamic */}
               <div style={{
                 marginLeft: "-28px", marginRight: "-28px",
-                marginBottom: "24px", overflow: "hidden", height: "48px",
+                marginBottom: "24px", overflow: "hidden", height: "64px",
                 animation: "revealUp 0.5s ease both 0.25s",
+                position: "relative",
               }}>
-                <svg width="200%" height="48" viewBox="0 0 600 48" preserveAspectRatio="none" style={{
-                  animation: "scrollLine 24s linear infinite",
+                {/* Layer 1 — primary rhythm, bold */}
+                <svg width="200%" height="64" viewBox="0 0 800 64" preserveAspectRatio="none" style={{
+                  position: "absolute", top: 0, left: 0,
+                  animation: "scrollLine 18s linear infinite, wavePulse1 4s ease-in-out infinite",
+                }}>
+                  <defs>
+                    <linearGradient id="waveGrad1" x1="0%" y1="0%" x2="100%" y2="0%">
+                      <stop offset="0%" stopColor={MF.accent} stopOpacity="0" />
+                      <stop offset="20%" stopColor={MF.accent} stopOpacity="1" />
+                      <stop offset="80%" stopColor={MF.accent} stopOpacity="1" />
+                      <stop offset="100%" stopColor={MF.accent} stopOpacity="0" />
+                    </linearGradient>
+                  </defs>
+                  <path
+                    d="M0,32 C30,12 60,12 90,32 C120,52 150,52 180,32 C210,12 240,12 270,32 C300,52 330,52 360,32 C390,12 420,12 450,32 C480,52 510,52 540,32 C570,12 600,12 630,32 C660,52 690,52 720,32 C750,12 780,12 800,32"
+                    fill="none" stroke="url(#waveGrad1)" strokeWidth="2.5" strokeLinecap="round"
+                  />
+                </svg>
+                {/* Layer 2 — offset rhythm, lighter, faster */}
+                <svg width="200%" height="64" viewBox="0 0 800 64" preserveAspectRatio="none" style={{
+                  position: "absolute", top: 0, left: 0,
+                  animation: "scrollLine2 14s linear infinite, wavePulse2 6s ease-in-out infinite 1s",
                 }}>
                   <path
-                    d="M0,24 C25,6 50,6 75,24 C100,42 125,42 150,24 C175,6 200,6 225,24 C250,42 275,42 300,24 C325,6 350,6 375,24 C400,42 425,42 450,24 C475,6 500,6 525,24 C550,42 575,42 600,24"
-                    fill="none"
-                    stroke={MF.accent}
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    opacity="0.35"
+                    d="M0,32 C40,8 80,8 120,32 C160,56 200,56 240,32 C280,8 320,8 360,32 C400,56 440,56 480,32 C520,8 560,8 600,32 C640,56 680,56 720,32 C760,8 800,8 800,32"
+                    fill="none" stroke={MF.accent} strokeWidth="1.5" strokeLinecap="round"
+                  />
+                </svg>
+                {/* Layer 3 — slow deep pulse, subtle */}
+                <svg width="200%" height="64" viewBox="0 0 800 64" preserveAspectRatio="none" style={{
+                  position: "absolute", top: 0, left: 0,
+                  animation: "scrollLine3 28s linear infinite, wavePulse3 8s ease-in-out infinite 2s",
+                }}>
+                  <path
+                    d="M0,32 C50,18 100,18 150,32 C200,46 250,46 300,32 C350,18 400,18 450,32 C500,46 550,46 600,32 C650,18 700,18 750,32 C800,46 800,46 800,32"
+                    fill="none" stroke={MF.accent} strokeWidth="1" strokeLinecap="round"
                   />
                 </svg>
               </div>
