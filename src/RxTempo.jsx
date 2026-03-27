@@ -2776,7 +2776,7 @@ export default function RxTempo() {
                 animation: "revealUp 0.5s ease both 0.25s",
               }}>
                 <div style={{ width: "200%", animation: "scrollLine 20s linear infinite" }}>
-                <svg width="100%" height="72" viewBox="0 0 800 72" preserveAspectRatio="none" style={{
+                <svg width="100%" height="72" viewBox="0 0 750 72" preserveAspectRatio="none" style={{
                   animation: "rhythmPulse 4s ease-in-out infinite",
                   transformOrigin: "center center",
                 }}>
@@ -2787,11 +2787,11 @@ export default function RxTempo() {
                     </linearGradient>
                   </defs>
                   <path
-                    d="M0,36 C25,4 50,4 75,36 C100,68 125,68 150,36 C175,4 200,4 225,36 C250,68 275,68 300,36 C325,4 350,4 375,36 C400,68 425,68 450,36 C475,4 500,4 525,36 C550,68 575,68 600,36 C625,4 650,4 675,36 C700,68 725,68 750,36 C775,4 800,4 800,36 L800,72 L0,72 Z"
+                    d="M0,36 C25,4 50,4 75,36 C100,68 125,68 150,36 C175,4 200,4 225,36 C250,68 275,68 300,36 C325,4 350,4 375,36 C400,68 425,68 450,36 C475,4 500,4 525,36 C550,68 575,68 600,36 C625,4 650,4 675,36 C700,68 725,68 750,36 L750,72 L0,72 Z"
                     fill="url(#rFill)"
                   />
                   <path
-                    d="M0,36 C25,4 50,4 75,36 C100,68 125,68 150,36 C175,4 200,4 225,36 C250,68 275,68 300,36 C325,4 350,4 375,36 C400,68 425,68 450,36 C475,4 500,4 525,36 C550,68 575,68 600,36 C625,4 650,4 675,36 C700,68 725,68 750,36 C775,4 800,4 800,36"
+                    d="M0,36 C25,4 50,4 75,36 C100,68 125,68 150,36 C175,4 200,4 225,36 C250,68 275,68 300,36 C325,4 350,4 375,36 C400,68 425,68 450,36 C475,4 500,4 525,36 C550,68 575,68 600,36 C625,4 650,4 675,36 C700,68 725,68 750,36"
                     fill="none"
                     stroke={MF.accent}
                     strokeWidth="2"
