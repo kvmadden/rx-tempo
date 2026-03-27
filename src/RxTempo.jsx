@@ -2743,7 +2743,7 @@ export default function RxTempo() {
             </div>
 
             {/* Vertically centered content */}
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "12px 28px" }}>
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "40px 28px 24px" }}>
 
               {/* Headline — Rx in blue, Tempo in white, LITE badge */}
               <div style={{ animation: "revealUp 0.5s ease both 0.15s", marginBottom: "24px" }}>
