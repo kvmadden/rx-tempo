@@ -2657,6 +2657,11 @@ export default function RxTempo() {
           @keyframes revealScale { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } }
           @keyframes pulseLine { 0%, 100% { opacity: 0.12; } 50% { opacity: 0.25; } }
           @keyframes scrollLine { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+          @keyframes eqBar0 { 0% { height: 20%; } 100% { height: 95%; } }
+          @keyframes eqBar1 { 0% { height: 30%; } 100% { height: 75%; } }
+          @keyframes eqBar2 { 0% { height: 15%; } 100% { height: 85%; } }
+          @keyframes eqBar3 { 0% { height: 40%; } 100% { height: 65%; } }
+          @keyframes eqBar4 { 0% { height: 10%; } 100% { height: 100%; } }
         `}</style>
 
         {isSetup ? (
@@ -2768,76 +2773,36 @@ export default function RxTempo() {
                 </p>
               </div>
 
-              {/* Rhythm wave — morphing pulse */}
+              {/* Rhythm equalizer bars */}
               <div style={{
                 marginLeft: "-28px", marginRight: "-28px",
-                marginBottom: "24px", overflow: "hidden", height: "80px",
+                marginBottom: "24px", overflow: "hidden", height: "56px",
                 animation: "revealUp 0.5s ease both 0.25s",
-                position: "relative",
+                display: "flex", alignItems: "flex-end", justifyContent: "center",
+                gap: "3px", padding: "0 20px",
               }}>
-                <svg width="100%" height="80" viewBox="0 0 400 80" preserveAspectRatio="none">
-                  <defs>
-                    <linearGradient id="waveFill" x1="0%" y1="0%" x2="0%" y2="100%">
-                      <stop offset="0%" stopColor={MF.accent} stopOpacity="0.15" />
-                      <stop offset="100%" stopColor={MF.accent} stopOpacity="0" />
-                    </linearGradient>
-                    <linearGradient id="waveStroke" x1="0%" y1="0%" x2="100%" y2="0%">
-                      <stop offset="0%" stopColor={MF.accent} stopOpacity="0" />
-                      <stop offset="15%" stopColor={MF.accent} stopOpacity="0.6" />
-                      <stop offset="50%" stopColor={MF.accent} stopOpacity="0.8" />
-                      <stop offset="85%" stopColor={MF.accent} stopOpacity="0.6" />
-                      <stop offset="100%" stopColor={MF.accent} stopOpacity="0" />
-                    </linearGradient>
-                  </defs>
-                  {/* Filled area under the wave */}
-                  <path fill="url(#waveFill)" stroke="none">
-                    <animate
-                      attributeName="d"
-                      dur="6s"
-                      repeatCount="indefinite"
-                      values="
-                        M0,40 C30,10 70,10 100,40 C130,70 170,70 200,40 C230,10 270,10 300,40 C330,70 370,70 400,40 L400,80 L0,80 Z;
-                        M0,40 C40,65 60,65 100,40 C140,15 160,15 200,40 C240,65 260,65 300,40 C340,15 360,15 400,40 L400,80 L0,80 Z;
-                        M0,40 C25,5 75,5 100,40 C125,75 175,75 200,40 C225,5 275,5 300,40 C325,75 375,75 400,40 L400,80 L0,80 Z;
-                        M0,40 C30,10 70,10 100,40 C130,70 170,70 200,40 C230,10 270,10 300,40 C330,70 370,70 400,40 L400,80 L0,80 Z
-                      "
-                      calcMode="spline"
-                      keySplines="0.45 0 0.55 1; 0.45 0 0.55 1; 0.45 0 0.55 1"
-                    />
-                  </path>
-                  {/* Main stroke */}
-                  <path fill="none" stroke="url(#waveStroke)" strokeWidth="2.5" strokeLinecap="round">
-                    <animate
-                      attributeName="d"
-                      dur="6s"
-                      repeatCount="indefinite"
-                      values="
-                        M0,40 C30,10 70,10 100,40 C130,70 170,70 200,40 C230,10 270,10 300,40 C330,70 370,70 400,40;
-                        M0,40 C40,65 60,65 100,40 C140,15 160,15 200,40 C240,65 260,65 300,40 C340,15 360,15 400,40;
-                        M0,40 C25,5 75,5 100,40 C125,75 175,75 200,40 C225,5 275,5 300,40 C325,75 375,75 400,40;
-                        M0,40 C30,10 70,10 100,40 C130,70 170,70 200,40 C230,10 270,10 300,40 C330,70 370,70 400,40
-                      "
-                      calcMode="spline"
-                      keySplines="0.45 0 0.55 1; 0.45 0 0.55 1; 0.45 0 0.55 1"
-                    />
-                  </path>
-                  {/* Subtle echo stroke */}
-                  <path fill="none" stroke={MF.accent} strokeWidth="1" strokeLinecap="round" opacity="0.15">
-                    <animate
-                      attributeName="d"
-                      dur="6s"
-                      repeatCount="indefinite"
-                      values="
-                        M0,40 C40,65 60,65 100,40 C140,15 160,15 200,40 C240,65 260,65 300,40 C340,15 360,15 400,40;
-                        M0,40 C25,5 75,5 100,40 C125,75 175,75 200,40 C225,5 275,5 300,40 C325,75 375,75 400,40;
-                        M0,40 C30,10 70,10 100,40 C130,70 170,70 200,40 C230,10 270,10 300,40 C330,70 370,70 400,40;
-                        M0,40 C40,65 60,65 100,40 C140,15 160,15 200,40 C240,65 260,65 300,40 C340,15 360,15 400,40
-                      "
-                      calcMode="spline"
-                      keySplines="0.45 0 0.55 1; 0.45 0 0.55 1; 0.45 0 0.55 1"
-                    />
-                  </path>
-                </svg>
+                {(() => {
+                  const barCount = 32;
+                  const center = barCount / 2;
+                  return Array.from({ length: barCount }, (_, i) => {
+                    const distFromCenter = Math.abs(i - center) / center;
+                    const maxH = Math.round(48 - distFromCenter * 30);
+                    const minH = Math.round(6 + (1 - distFromCenter) * 6);
+                    const dur = (1.0 + (i % 5) * 0.3 + (i % 3) * 0.2).toFixed(1);
+                    const delay = (i * 0.08).toFixed(2);
+                    return (
+                      <div key={i} style={{
+                        flex: 1,
+                        borderRadius: "2px",
+                        background: `linear-gradient(to top, ${MF.accent}${Math.round((1 - distFromCenter * 0.6) * 255).toString(16).padStart(2, '0')}, ${MF.accent}40)`,
+                        animation: `eqBar${i % 5} ${dur}s ease-in-out ${delay}s infinite alternate`,
+                        minHeight: `${minH}px`,
+                        maxHeight: `${maxH}px`,
+                        height: `${maxH}px`,
+                      }} />
+                    );
+                  });
+                })()}
               </div>
 
               {/* Value propositions */}
