@@ -2696,7 +2696,7 @@ export default function RxTempo() {
             </div>
           </>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", height: "100vh", position: "relative", overflow: "hidden" }}>
+          <div style={{ display: "flex", flexDirection: "column", height: "100dvh", position: "relative", overflow: "hidden" }}>
             {/* Background glow effects */}
             <div style={{
               position: "absolute", top: "-60px", left: "-60px", width: "320px", height: "320px",
@@ -2743,7 +2743,7 @@ export default function RxTempo() {
             </div>
 
             {/* Vertically centered content */}
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "40px 28px 24px" }}>
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "40px 28px 40px" }}>
 
               {/* Headline — Rx in blue, Tempo in white, LITE badge */}
               <div style={{ animation: "revealUp 0.5s ease both 0.15s", marginBottom: "24px" }}>
@@ -2789,7 +2789,7 @@ export default function RxTempo() {
               </div>
 
               {/* Value propositions */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "20px", animation: "revealUp 0.5s ease both 0.3s", marginBottom: "24px" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "24px", animation: "revealUp 0.5s ease both 0.3s", marginBottom: "28px" }}>
                 {[
                   {
                     icon: <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={MF.accent} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
@@ -2848,7 +2848,7 @@ export default function RxTempo() {
 
               {/* Footer */}
               <div style={{
-                textAlign: "center", marginTop: "24px",
+                textAlign: "center", marginTop: "32px",
                 animation: "revealUp 0.5s ease both 0.85s",
               }}>
                 <div style={{
