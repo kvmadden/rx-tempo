@@ -2772,41 +2772,31 @@ export default function RxTempo() {
               {/* Rhythm wave */}
               <div style={{
                 marginLeft: "-28px", marginRight: "-28px",
-                marginBottom: "24px", overflow: "hidden", height: "80px",
+                marginBottom: "24px", overflow: "hidden", height: "72px",
                 animation: "revealUp 0.5s ease both 0.25s",
               }}>
-                <svg width="100%" height="80" viewBox="0 0 400 80" preserveAspectRatio="none" style={{
-                  animation: "rhythmPulse 3s ease-in-out infinite",
+                <svg width="200%" height="72" viewBox="0 0 800 72" preserveAspectRatio="none" style={{
+                  animation: "scrollLine 20s linear infinite, rhythmPulse 4s ease-in-out infinite",
                   transformOrigin: "center center",
                 }}>
                   <defs>
                     <linearGradient id="rFill" x1="0%" y1="0%" x2="0%" y2="100%">
-                      <stop offset="0%" stopColor={MF.accent} stopOpacity="0.2" />
-                      <stop offset="100%" stopColor={MF.accent} stopOpacity="0.02" />
-                    </linearGradient>
-                    <linearGradient id="rStroke" x1="0%" y1="0%" x2="100%" y2="0%">
-                      <stop offset="0%" stopColor={MF.accent} stopOpacity="0.05" />
-                      <stop offset="12%" stopColor={MF.accent} stopOpacity="0.5" />
-                      <stop offset="50%" stopColor={MF.accent} stopOpacity="0.7" />
-                      <stop offset="88%" stopColor={MF.accent} stopOpacity="0.5" />
-                      <stop offset="100%" stopColor={MF.accent} stopOpacity="0.05" />
+                      <stop offset="0%" stopColor={MF.accent} stopOpacity="0.18" />
+                      <stop offset="100%" stopColor={MF.accent} stopOpacity="0" />
                     </linearGradient>
                   </defs>
                   <path
-                    d="M0,40 Q50,4 100,40 T200,40 T300,40 T400,40"
+                    d="M0,36 C25,4 50,4 75,36 C100,68 125,68 150,36 C175,4 200,4 225,36 C250,68 275,68 300,36 C325,4 350,4 375,36 C400,68 425,68 450,36 C475,4 500,4 525,36 C550,68 575,68 600,36 C625,4 650,4 675,36 C700,68 725,68 750,36 C775,4 800,4 800,36 L800,72 L0,72 Z"
                     fill="url(#rFill)"
-                    stroke="url(#rStroke)"
+                  />
+                  <path
+                    d="M0,36 C25,4 50,4 75,36 C100,68 125,68 150,36 C175,4 200,4 225,36 C250,68 275,68 300,36 C325,4 350,4 375,36 C400,68 425,68 450,36 C475,4 500,4 525,36 C550,68 575,68 600,36 C625,4 650,4 675,36 C700,68 725,68 750,36 C775,4 800,4 800,36"
+                    fill="none"
+                    stroke={MF.accent}
                     strokeWidth="2"
                     strokeLinecap="round"
-                  >
-                    <animate attributeName="d" dur="3s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1; 0.4 0 0.6 1; 0.4 0 0.6 1; 0.4 0 0.6 1" values="
-                      M0,40 Q50,4 100,40 T200,40 T300,40 T400,40;
-                      M0,40 Q50,40 100,40 Q150,76 200,40 T300,40 T400,40;
-                      M0,40 T100,40 Q150,40 200,40 Q250,4 300,40 T400,40;
-                      M0,40 T100,40 T200,40 Q250,40 300,40 Q350,76 400,40;
-                      M0,40 Q50,4 100,40 T200,40 T300,40 T400,40
-                    " />
-                  </path>
+                    opacity="0.5"
+                  />
                 </svg>
               </div>
 
