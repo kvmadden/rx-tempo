@@ -2657,11 +2657,7 @@ export default function RxTempo() {
           @keyframes revealScale { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } }
           @keyframes pulseLine { 0%, 100% { opacity: 0.12; } 50% { opacity: 0.25; } }
           @keyframes scrollLine { from { transform: translateX(0); } to { transform: translateX(-50%); } }
-          @keyframes eqBar0 { 0% { height: 20%; } 100% { height: 95%; } }
-          @keyframes eqBar1 { 0% { height: 30%; } 100% { height: 75%; } }
-          @keyframes eqBar2 { 0% { height: 15%; } 100% { height: 85%; } }
-          @keyframes eqBar3 { 0% { height: 40%; } 100% { height: 65%; } }
-          @keyframes eqBar4 { 0% { height: 10%; } 100% { height: 100%; } }
+          @keyframes rhythmPulse { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(1.15); } }
         `}</style>
 
         {isSetup ? (
@@ -2773,36 +2769,45 @@ export default function RxTempo() {
                 </p>
               </div>
 
-              {/* Rhythm equalizer bars */}
+              {/* Rhythm wave */}
               <div style={{
                 marginLeft: "-28px", marginRight: "-28px",
-                marginBottom: "24px", overflow: "hidden", height: "56px",
+                marginBottom: "24px", overflow: "hidden", height: "80px",
                 animation: "revealUp 0.5s ease both 0.25s",
-                display: "flex", alignItems: "flex-end", justifyContent: "center",
-                gap: "3px", padding: "0 20px",
               }}>
-                {(() => {
-                  const barCount = 32;
-                  const center = barCount / 2;
-                  return Array.from({ length: barCount }, (_, i) => {
-                    const distFromCenter = Math.abs(i - center) / center;
-                    const maxH = Math.round(48 - distFromCenter * 30);
-                    const minH = Math.round(6 + (1 - distFromCenter) * 6);
-                    const dur = (1.0 + (i % 5) * 0.3 + (i % 3) * 0.2).toFixed(1);
-                    const delay = (i * 0.08).toFixed(2);
-                    return (
-                      <div key={i} style={{
-                        flex: 1,
-                        borderRadius: "2px",
-                        background: `linear-gradient(to top, ${MF.accent}${Math.round((1 - distFromCenter * 0.6) * 255).toString(16).padStart(2, '0')}, ${MF.accent}40)`,
-                        animation: `eqBar${i % 5} ${dur}s ease-in-out ${delay}s infinite alternate`,
-                        minHeight: `${minH}px`,
-                        maxHeight: `${maxH}px`,
-                        height: `${maxH}px`,
-                      }} />
-                    );
-                  });
-                })()}
+                <svg width="100%" height="80" viewBox="0 0 400 80" preserveAspectRatio="none" style={{
+                  animation: "rhythmPulse 3s ease-in-out infinite",
+                  transformOrigin: "center center",
+                }}>
+                  <defs>
+                    <linearGradient id="rFill" x1="0%" y1="0%" x2="0%" y2="100%">
+                      <stop offset="0%" stopColor={MF.accent} stopOpacity="0.2" />
+                      <stop offset="100%" stopColor={MF.accent} stopOpacity="0.02" />
+                    </linearGradient>
+                    <linearGradient id="rStroke" x1="0%" y1="0%" x2="100%" y2="0%">
+                      <stop offset="0%" stopColor={MF.accent} stopOpacity="0.05" />
+                      <stop offset="12%" stopColor={MF.accent} stopOpacity="0.5" />
+                      <stop offset="50%" stopColor={MF.accent} stopOpacity="0.7" />
+                      <stop offset="88%" stopColor={MF.accent} stopOpacity="0.5" />
+                      <stop offset="100%" stopColor={MF.accent} stopOpacity="0.05" />
+                    </linearGradient>
+                  </defs>
+                  <path
+                    d="M0,40 Q50,4 100,40 T200,40 T300,40 T400,40"
+                    fill="url(#rFill)"
+                    stroke="url(#rStroke)"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  >
+                    <animate attributeName="d" dur="3s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1; 0.4 0 0.6 1; 0.4 0 0.6 1; 0.4 0 0.6 1" values="
+                      M0,40 Q50,4 100,40 T200,40 T300,40 T400,40;
+                      M0,40 Q50,40 100,40 Q150,76 200,40 T300,40 T400,40;
+                      M0,40 T100,40 Q150,40 200,40 Q250,4 300,40 T400,40;
+                      M0,40 T100,40 T200,40 Q250,40 300,40 Q350,76 400,40;
+                      M0,40 Q50,4 100,40 T200,40 T300,40 T400,40
+                    " />
+                  </path>
+                </svg>
               </div>
 
               {/* Value propositions */}
