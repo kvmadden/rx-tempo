@@ -2775,8 +2775,9 @@ export default function RxTempo() {
                 marginBottom: "24px", overflow: "hidden", height: "72px",
                 animation: "revealUp 0.5s ease both 0.25s",
               }}>
-                <svg width="200%" height="72" viewBox="0 0 800 72" preserveAspectRatio="none" style={{
-                  animation: "scrollLine 20s linear infinite, rhythmPulse 4s ease-in-out infinite",
+                <div style={{ width: "200%", animation: "scrollLine 20s linear infinite" }}>
+                <svg width="100%" height="72" viewBox="0 0 800 72" preserveAspectRatio="none" style={{
+                  animation: "rhythmPulse 4s ease-in-out infinite",
                   transformOrigin: "center center",
                 }}>
                   <defs>
@@ -2798,6 +2799,7 @@ export default function RxTempo() {
                     opacity="0.5"
                   />
                 </svg>
+                </div>
               </div>
 
               {/* Value propositions */}
