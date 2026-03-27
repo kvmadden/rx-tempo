@@ -2743,10 +2743,10 @@ export default function RxTempo() {
             </div>
 
             {/* Vertically centered content */}
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", padding: "24px 28px" }}>
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", padding: "16px 28px" }}>
 
               {/* Headline — Rx in blue, Tempo in white, LITE badge */}
-              <div style={{ animation: "revealUp 0.5s ease both 0.15s", marginBottom: "32px" }}>
+              <div style={{ animation: "revealUp 0.5s ease both 0.15s", marginBottom: "24px" }}>
                 <h1 style={{
                   fontSize: "52px", fontWeight: 700, letterSpacing: "-0.04em",
                   lineHeight: 1.05, marginBottom: "14px", display: "flex", alignItems: "baseline", gap: "4px",
@@ -2771,7 +2771,7 @@ export default function RxTempo() {
               {/* Rolling hills rhythm wave — full width, dynamic */}
               <div style={{
                 marginLeft: "-28px", marginRight: "-28px",
-                marginBottom: "32px", overflow: "hidden", height: "48px",
+                marginBottom: "24px", overflow: "hidden", height: "36px",
                 animation: "revealUp 0.5s ease both 0.25s",
               }}>
                 <svg width="200%" height="48" viewBox="0 0 600 48" preserveAspectRatio="none" style={{
@@ -2789,7 +2789,7 @@ export default function RxTempo() {
               </div>
 
               {/* Value propositions */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "28px", animation: "revealUp 0.5s ease both 0.3s", marginBottom: "32px" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "20px", animation: "revealUp 0.5s ease both 0.3s", marginBottom: "24px" }}>
                 {[
                   {
                     icon: <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={MF.accent} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
@@ -2838,33 +2838,33 @@ export default function RxTempo() {
                   Start your day
                 </button>
                 <div style={{
-                  textAlign: "center", marginTop: "24px",
+                  textAlign: "center", marginTop: "16px",
                   fontSize: "12px", color: MF.textMuted, opacity: 0.5, lineHeight: 1.7,
                 }}>
                   <div>Single-shift use only · No tracking or reporting · No history</div>
                   <div>Nothing is saved. No data leaves your device.</div>
                 </div>
               </div>
-            </div>
 
-            {/* Footer */}
-            <div style={{
-              textAlign: "center", padding: "0 28px 20px",
-              animation: "revealUp 0.5s ease both 0.85s",
-            }}>
+              {/* Footer */}
               <div style={{
-                display: "inline-flex", alignItems: "center", gap: "6px",
-                fontSize: "11px", color: MF.textMuted, opacity: 0.4,
-                padding: "6px 14px", borderRadius: "20px",
-                border: `1px solid ${MF.border}`,
-                marginBottom: "4px",
+                textAlign: "center", marginTop: "auto", paddingTop: "12px",
+                animation: "revealUp 0.5s ease both 0.85s",
               }}>
-                <span style={{ fontWeight: 600, letterSpacing: "0.04em" }}>MADDEN FRAMEWORKS</span>
-                <span style={{ opacity: 0.4 }}>·</span>
-                <span>© 2026</span>
-              </div>
-              <div style={{ fontSize: "12px", color: MF.textMuted, opacity: 0.35, fontStyle: "italic" }}>
-                Smart systems. Better judgment.
+                <div style={{
+                  display: "inline-flex", alignItems: "center", gap: "6px",
+                  fontSize: "11px", color: MF.textMuted, opacity: 0.4,
+                  padding: "6px 14px", borderRadius: "20px",
+                  border: `1px solid ${MF.border}`,
+                  marginBottom: "4px",
+                }}>
+                  <span style={{ fontWeight: 600, letterSpacing: "0.04em" }}>MADDEN FRAMEWORKS</span>
+                  <span style={{ opacity: 0.4 }}>·</span>
+                  <span>© 2026</span>
+                </div>
+                <div style={{ fontSize: "12px", color: MF.textMuted, opacity: 0.35, fontStyle: "italic" }}>
+                  Smart systems. Better judgment.
+                </div>
               </div>
             </div>
           </div>
