@@ -2743,9 +2743,8 @@ export default function RxTempo() {
             </div>
 
             {/* Vertically centered content */}
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between", padding: "24px 28px" }}>
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", padding: "24px 28px" }}>
 
-              <div>
               {/* Headline — Rx in blue, Tempo in white, LITE badge */}
               <div style={{ animation: "revealUp 0.5s ease both 0.15s", marginBottom: "24px" }}>
                 <h1 style={{
@@ -2846,11 +2845,10 @@ export default function RxTempo() {
                   <div>Nothing is saved. No data leaves your device.</div>
                 </div>
               </div>
-              </div>
 
               {/* Footer */}
               <div style={{
-                textAlign: "center", paddingTop: "12px",
+                textAlign: "center", marginTop: "24px",
                 animation: "revealUp 0.5s ease both 0.85s",
               }}>
                 <div style={{
