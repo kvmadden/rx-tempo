@@ -809,7 +809,7 @@ function SectionLabel({ children }) {
   return (
     <div style={{
       fontSize: "11px", fontWeight: 600, color: MF.textMuted, textTransform: "uppercase",
-      letterSpacing: "0.06em", marginBottom: "10px", marginTop: "24px",
+      letterSpacing: "0.06em", marginBottom: "8px", marginTop: "12px",
     }}>
       {children}
     </div>
@@ -817,12 +817,11 @@ function SectionLabel({ children }) {
 }
 
 // Empty / quiet state
-function QuietState({ icon, message, sub }) {
+function QuietState({ message, sub }) {
   return (
-    <div style={{ textAlign: "center", padding: "40px 24px", color: MF.textMuted }}>
-      <div style={{ fontSize: "28px", marginBottom: "10px", opacity: 0.35 }}>{icon || "○"}</div>
-      <div style={{ fontSize: "14px", lineHeight: 1.5 }}>{message}</div>
-      {sub && <div style={{ fontSize: "13px", marginTop: "4px", opacity: 0.7 }}>{sub}</div>}
+    <div style={{ textAlign: "center", padding: "16px 24px", color: MF.textMuted }}>
+      <div style={{ fontSize: "13px", lineHeight: 1.5 }}>{message}</div>
+      {sub && <div style={{ fontSize: "12px", marginTop: "2px", opacity: 0.7 }}>{sub}</div>}
     </div>
   );
 }
@@ -1706,25 +1705,17 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
   const highPressure = visible.length > 5 || queueState === "highdemand";
 
   return (
-    <div style={{ padding: "20px", animation: "fadeIn 0.2s ease" }}>
+    <div style={{ padding: "16px", animation: "fadeIn 0.2s ease" }}>
       {/* Phase header */}
-      <div style={{ marginBottom: "16px" }}>
+      <div style={{ marginBottom: "10px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
             <span style={{ fontSize: "13px", fontWeight: 600, color: MF.accent }}>{phaseLabel}</span>
-            <span style={badge(MF.textMuted, "rgba(139,148,158,0.1)")}>{ROLE_LABELS[setup.role]}</span>
-            {setup.shiftType && setup.shiftType !== "open-close" && (
-              <span style={badge(MF.textMuted, "rgba(139,148,158,0.1)")}>{SHIFT_TYPE_LABELS[setup.shiftType]}</span>
-            )}
-            <span style={badge(
-              ctx.coverageMode === "overlap" ? MF.accent : MF.textMuted,
-              ctx.coverageMode === "overlap" ? MF.accentDim : "rgba(139,148,158,0.1)"
-            )}>
-              {COVERAGE_LABELS[ctx.coverageMode]}
-            </span>
+            <span style={{ fontSize: "11px", color: MF.textMuted, opacity: 0.6 }}>·</span>
+            <span style={{ fontSize: "11px", color: MF.textMuted }}>{ROLE_LABELS[setup.role]}</span>
           </div>
           <span style={{ fontSize: "12px", color: MF.textMuted }}>
-            {fmtTime12(ctx.currentMin)} · {Math.round(ctx.shiftProgress * 100)}%
+            {fmtTime12(ctx.currentMin)}
           </span>
         </div>
         <div style={{ width: "100%", height: "3px", background: MF.border, borderRadius: "2px", overflow: "hidden" }}>
@@ -1739,21 +1730,20 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
       {/* ── Workflow status — always at top, always editable ── */}
       {onQueueState && setup.guidance !== "minimal" && (
         <div style={{
-          display: "flex", alignItems: "center", gap: "6px",
-          marginBottom: "14px", flexWrap: "wrap",
+          display: "flex", alignItems: "center", gap: "5px",
+          marginBottom: "12px",
         }}>
-          <span style={{ fontSize: "12px", color: MF.textMuted, fontWeight: 500 }}>Workflow</span>
           {[
-            { key: "clear", label: "All clear", color: MF.green, bg: MF.greenDim },
+            { key: "clear", label: "Clear", color: MF.green, bg: MF.greenDim },
             { key: "ontrack", label: "On track", color: MF.accent, bg: MF.accentDim },
-            { key: "needsfocus", label: "Needs focus", color: MF.amber, bg: MF.amberDim },
-            { key: "highdemand", label: "High demand", color: MF.amber, bg: MF.amberDim },
+            { key: "needsfocus", label: "Focus", color: MF.amber, bg: MF.amberDim },
+            { key: "highdemand", label: "High", color: MF.amber, bg: MF.amberDim },
           ].map((q) => (
             <button
               key={q.key}
               onClick={() => onQueueState(q.key)}
               style={{
-                padding: "5px 12px", borderRadius: "16px", fontSize: "11px", fontWeight: 600,
+                padding: "5px 10px", borderRadius: "14px", fontSize: "11px", fontWeight: 600,
                 fontFamily: MF.font, cursor: "pointer", transition: "all 0.15s ease",
                 border: queueState === q.key ? `1.5px solid ${q.color}` : `1px solid ${MF.border}`,
                 background: queueState === q.key ? q.bg : "transparent",
@@ -1830,13 +1820,10 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
                   <div key={e.key} style={{
                     background: MF.card, border: `1px solid ${MF.border}`,
                     borderLeft: `3px solid ${MF.secondary}`,
-                    borderRadius: MF.radius, padding: "14px 16px", marginBottom: "8px",
-                    display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px",
+                    borderRadius: MF.radius, padding: "10px 14px", marginBottom: "6px",
+                    display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px",
                   }}>
-                    <div>
-                      <div style={{ fontSize: "14px", fontWeight: 600, marginBottom: "2px" }}>{e.label}</div>
-                      <div style={{ fontSize: "12px", color: MF.textMuted, lineHeight: 1.4 }}>{e.pendingDesc}</div>
-                    </div>
+                    <div style={{ fontSize: "13px", fontWeight: 600 }}>{e.label}</div>
                     <button
                       onClick={() => onEventArrival(e.key, ctx.currentMin)}
                       style={{
@@ -1910,9 +1897,9 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
       )}
 
       {/* Pacing line */}
-      <h2 style={{ fontSize: "18px", fontWeight: 600, letterSpacing: "-0.02em", marginBottom: "18px" }}>
+      <div style={{ fontSize: "15px", fontWeight: 600, letterSpacing: "-0.02em", marginBottom: "12px" }}>
         {pacingLine}
-      </h2>
+      </div>
 
       {/* Visible items — compact rows with expand */}
       {visible.length === 0 ? (
