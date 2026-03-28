@@ -134,6 +134,58 @@ const RULES = [
     getAheadEligible: true,
     riskWeight: "medium",
   },
+  {
+    id: "mid-prior-auth",
+    label: "Pending prior authorizations",
+    description: "A pending PA blocks the fill completely. Calling the insurance and prescriber now prevents a patient from showing up to an empty pickup window.",
+    category: "midday",
+    itemType: "task",
+    usualWindow: { startOffset: 90, endOffset: 300 },
+    roleContext: "Someone's fill is waiting on this.",
+    carryLogic: "carry",
+    handoffEligibility: "exit",
+    getAheadEligible: false,
+    riskWeight: "high",
+  },
+  {
+    id: "mid-claim-rejections",
+    label: "Rejected insurance claims",
+    description: "A bounced claim stops the fill. Resolving it now — contacting insurance or notifying the patient — keeps scripts moving instead of piling up.",
+    category: "midday",
+    itemType: "task",
+    usualWindow: { startOffset: 120, endOffset: 300 },
+    roleContext: "Unresolved claims block patient pickups.",
+    carryLogic: "carry",
+    handoffEligibility: "exit",
+    getAheadEligible: false,
+    riskWeight: "high",
+  },
+  {
+    id: "mid-consult-check",
+    label: "Patient consultations due",
+    description: "New prescriptions, high-risk meds, and significant therapy changes require pharmacist consultation. Completing these before patients leave keeps you compliant.",
+    category: "midday",
+    itemType: "compliance",
+    usualWindow: { startOffset: 60, endOffset: 360 },
+    roleContext: "Required by state pharmacy law.",
+    carryLogic: "carry",
+    handoffEligibility: "arrival",
+    getAheadEligible: false,
+    riskWeight: "high",
+  },
+  {
+    id: "mid-narcotics-audit",
+    label: "Controlled substance spot check",
+    description: "Spot-check that recent C-II and C-III fills have matching hard-copy or electronic records. Catching a missing prescription now is much easier than at end-of-day reconciliation.",
+    category: "midday",
+    itemType: "compliance",
+    usualWindow: { startOffset: 180, endOffset: 300 },
+    roleContext: "Keeps the DEA log clean throughout the day.",
+    carryLogic: "carry",
+    handoffEligibility: null,
+    getAheadEligible: false,
+    riskWeight: "high",
+  },
   // ── DEADLINE WINDOW ──
   {
     id: "deadline-rts",
@@ -663,12 +715,13 @@ const THEMES = {
     secondaryDim: "rgba(126,184,240,0.12)",
     green: "#3FB950",
     greenDim: "rgba(63,185,80,0.12)",
-    amber: "#D29922",
+    amber: "#E3A832",
     amberDim: "rgba(210,153,34,0.12)",
-    compliance: "#C9727E",
+    compliance: "#DA8B96",
     complianceDim: "rgba(201,114,126,0.12)",
     danger: "#F85149",
     dangerDim: "rgba(248,81,73,0.12)",
+    mutedBg: MF.mutedBg,
     gradient: "linear-gradient(135deg, #4A9EFF 0%, #3A7FCC 100%)",
     topBarBg: "rgba(15,17,20,0.95)",
     navBg: "rgba(15,17,20,0.95)",
@@ -694,6 +747,7 @@ const THEMES = {
     complianceDim: "rgba(168,80,92,0.1)",
     danger: "#CF222E",
     dangerDim: "rgba(207,34,46,0.1)",
+    mutedBg: "rgba(92,99,112,0.08)",
     gradient: "linear-gradient(135deg, #2D7ABF 0%, #24629A 100%)",
     topBarBg: "rgba(238,238,242,0.95)",
     navBg: "rgba(238,238,242,0.95)",
@@ -1095,7 +1149,6 @@ function StartDayScreen({ onComplete }) {
     },
     immTarget: +immTarget,
     guidance,
-    eventArrivals: {},
     setupTimestamp: Date.now(),
   };
 
@@ -1407,7 +1460,16 @@ function StartDayScreen({ onComplete }) {
                 return v >= s || v <= e; // overnight
               });
               const updateWindow = (idx, field, val) => {
-                setOverlapWindows((prev) => prev.map((w, i) => i === idx ? { ...w, [field]: val } : w));
+                setOverlapWindows((prev) => prev.map((w, i) => {
+                  if (i !== idx) return w;
+                  const updated = { ...w, [field]: val };
+                  // Auto-swap if start > end (non-overnight shifts)
+                  const s = +shiftStart, e = +shiftEnd;
+                  if (e >= s && +updated.start > +updated.end) {
+                    return { start: updated.end, end: updated.start };
+                  }
+                  return updated;
+                }));
               };
               const addWindow = () => {
                 setOverlapWindows((prev) => [...prev, { start: +shiftStart + 120, end: +shiftEnd }]);
@@ -1537,7 +1599,7 @@ function StartDayScreen({ onComplete }) {
                   </button>
                   <button
                     onClick={() => setConfirmToggle(null)}
-                    style={{ ...btn(MF.textMuted, "rgba(139,148,158,0.08)"), flex: 1, padding: "10px", textAlign: "center" }}
+                    style={{ ...btn(MF.textMuted, MF.mutedBg), flex: 1, padding: "10px", textAlign: "center" }}
                   >
                     Keep it on
                   </button>
@@ -1546,7 +1608,7 @@ function StartDayScreen({ onComplete }) {
             )}
             <div style={{ display: "flex", gap: "10px" }}>
               <button
-                style={{ ...btn(MF.textMuted, "rgba(139,148,158,0.08)"), flex: 1, padding: "14px", textAlign: "center" }}
+                style={{ ...btn(MF.textMuted, MF.mutedBg), flex: 1, padding: "14px", textAlign: "center" }}
                 onClick={() => setStep("form1")}
               >Back</button>
               <button
@@ -1684,7 +1746,7 @@ function StartDayScreen({ onComplete }) {
 
             <div style={{ display: "flex", gap: "10px" }}>
               <button
-                style={{ ...btn(MF.textMuted, "rgba(139,148,158,0.08)"), flex: 1, padding: "14px", textAlign: "center" }}
+                style={{ ...btn(MF.textMuted, MF.mutedBg), flex: 1, padding: "14px", textAlign: "center" }}
                 onClick={() => setStep("form2")}
               >Back</button>
               <button
@@ -1730,13 +1792,22 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
   const WEIGHT_RANK = { high: 0, medium: 1, low: 2 };
   const MAX_SHOWN = 4;
 
+  const isPIC = setup.role === "pharmacist-manager";
+  const TYPE_RANK = { compliance: 0, task: 1, check: 2 };
   const visible = rules.filter((r) =>
     [S.VISIBLE, S.NEEDS_ATTENTION, S.VISIBLE_HANDOFF].includes(itemStates[r.id])
   ).sort((a, b) => {
-    // Needs attention first, then by risk weight
+    // Needs attention first
     const aAttn = itemStates[a.id] === S.NEEDS_ATTENTION ? 0 : 1;
     const bAttn = itemStates[b.id] === S.NEEDS_ATTENTION ? 0 : 1;
     if (aAttn !== bAttn) return aAttn - bAttn;
+    // PIC/PM: compliance items float to top (accountability)
+    if (isPIC) {
+      const aType = (TYPE_RANK[a.itemType] ?? 1);
+      const bType = (TYPE_RANK[b.itemType] ?? 1);
+      if (aType !== bType) return aType - bType;
+    }
+    // Then by risk weight
     return (WEIGHT_RANK[a.riskWeight] || 2) - (WEIGHT_RANK[b.riskWeight] || 2);
   });
   const confirmed = rules.filter((r) =>
@@ -1884,7 +1955,7 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
                   <button style={btn(MF.amber, MF.amberDim)} onClick={() => { onDayNoteState(idx, "dismissed"); onDayNoteConfirm(null); }}>
                     Yes, dismiss
                   </button>
-                  <button style={btn(MF.textMuted, "rgba(139,148,158,0.08)")} onClick={() => onDayNoteConfirm(null)}>
+                  <button style={btn(MF.textMuted, MF.mutedBg)} onClick={() => onDayNoteConfirm(null)}>
                     Keep it
                   </button>
                 </div>
@@ -1894,7 +1965,7 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
                 <button style={btn(MF.green, MF.greenDim)} onClick={() => onDayNoteState(idx, "happened")}>
                   Already happened
                 </button>
-                <button style={btn(MF.textMuted, "rgba(139,148,158,0.08)")} onClick={() => onDayNoteConfirm(idx)}>
+                <button style={btn(MF.textMuted, MF.mutedBg)} onClick={() => onDayNoteConfirm(idx)}>
                   Dismiss
                 </button>
               </div>
@@ -1903,8 +1974,8 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
         );
       })}
 
-      {/* Status line — pacing + pressure + streak */}
-      <div style={{ fontSize: "13px", color: MF.text, fontWeight: 500, marginBottom: "8px", lineHeight: 1.4 }}>
+      {/* Status line — pacing + pressure + streak (hidden for minimal guidance) */}
+      {guidanceLevel !== "minimal" && <div style={{ fontSize: "13px", color: MF.text, fontWeight: 500, marginBottom: "8px", lineHeight: 1.4 }}>
         {onAStreak ? "On a roll." : pacingLine}
         {queueState === "highdemand" && (
           <span style={{ color: MF.amber, marginLeft: "6px", fontSize: "12px", fontWeight: 400 }}>· Optional items hidden</span>
@@ -1915,7 +1986,7 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
         {queueState === "clear" && visible.length === 0 && coveredCount > 0 && (
           <span style={{ color: MF.green, marginLeft: "6px", fontSize: "12px", fontWeight: 400 }}>· Check Ahead tab</span>
         )}
-      </div>
+      </div>}
 
       {/* Shift summary — appears in closing phase with full guidance */}
       {showSummary && ctx.shiftProgress >= 0.85 && coveredCount > 0 && (() => {
@@ -2098,7 +2169,7 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
                               Yes, skip today
                             </button>
                             <button
-                              style={btn(MF.textMuted, "rgba(139,148,158,0.08)")}
+                              style={btn(MF.textMuted, MF.mutedBg)}
                               onClick={() => setConfirmSkipCompliance(null)}
                             >
                               Cancel
@@ -2113,7 +2184,7 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
                           <button style={btn(MF.amber, MF.amberDim)} onClick={() => { onAction(r.id, S.NEEDS_ATTENTION); setExpandedItem(null); }}>
                             Still needs attention
                           </button>
-                          <button style={btn(MF.textMuted, "rgba(139,148,158,0.08)")} onClick={() => setConfirmSkipCompliance(r.id)}>
+                          <button style={btn(MF.textMuted, MF.mutedBg)} onClick={() => setConfirmSkipCompliance(r.id)}>
                             Skip for today
                           </button>
                         </div>
@@ -2206,7 +2277,7 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
                       <button style={btn(MF.amber, MF.amberDim)} onClick={() => { onAction(r.id, S.NEEDS_ATTENTION); setExpandedItem(null); }}>
                         Still needs attention
                       </button>
-                      <button style={btn(MF.textMuted, "rgba(139,148,158,0.08)")} onClick={() => { onAction(r.id, S.NOT_APPLICABLE); setExpandedItem(null); }}>
+                      <button style={btn(MF.textMuted, MF.mutedBg)} onClick={() => { onAction(r.id, S.NOT_APPLICABLE); setExpandedItem(null); }}>
                         Skip for today
                       </button>
                     </div>
@@ -2353,7 +2424,7 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
                           <button style={btn(MF.compliance, MF.complianceDim)} onClick={() => { onAction(r.id, S.NOT_APPLICABLE); setExpandedItem(null); setConfirmSkipCompliance(null); }}>
                             Yes, skip today
                           </button>
-                          <button style={btn(MF.textMuted, "rgba(139,148,158,0.08)")} onClick={() => setConfirmSkipCompliance(null)}>
+                          <button style={btn(MF.textMuted, MF.mutedBg)} onClick={() => setConfirmSkipCompliance(null)}>
                             Cancel
                           </button>
                         </div>
@@ -2366,7 +2437,7 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
                         <button style={btn(MF.amber, MF.amberDim)} onClick={() => { onAction(r.id, S.NEEDS_ATTENTION); setExpandedItem(null); }}>
                           Still needs attention
                         </button>
-                        <button style={btn(MF.textMuted, "rgba(139,148,158,0.08)")} onClick={() => { isComp ? setConfirmSkipCompliance(`still-${r.id}`) : (() => { onAction(r.id, S.NOT_APPLICABLE); setExpandedItem(null); })(); }}>
+                        <button style={btn(MF.textMuted, MF.mutedBg)} onClick={() => { isComp ? setConfirmSkipCompliance(`still-${r.id}`) : (() => { onAction(r.id, S.NOT_APPLICABLE); setExpandedItem(null); })(); }}>
                           Skip for today
                         </button>
                       </div>
@@ -2518,7 +2589,7 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
                   <button
                     onClick={(e) => { e.stopPropagation(); onVaccine(Math.max(0, vaccineCount - 1)); }}
                     style={{
-                      ...btn(MF.textMuted, "rgba(139,148,158,0.08)"),
+                      ...btn(MF.textMuted, MF.mutedBg),
                       padding: "8px 12px", fontSize: "12px", borderRadius: MF.radiusSm,
                     }}
                   >
@@ -2626,6 +2697,11 @@ function getHandoffScenario(setup) {
 // ARRIVAL HANDSHAKE — adaptive based on shift scenario
 function ArrivalScreen({ rules, itemStates, ctx, onAction, setup }) {
   const [expandedItem, setExpandedItem] = useState(null);
+  const [justConfirmed, setJustConfirmed] = useState(null);
+  const handleConfirm = (ruleId, state) => {
+    setJustConfirmed(ruleId);
+    setTimeout(() => { onAction(ruleId, state); setExpandedItem(null); setJustConfirmed(null); }, 400);
+  };
   const scenario = getHandoffScenario(setup);
   const items = rules.filter((r) =>
     r.handoffEligibility === "arrival" &&
@@ -2706,14 +2782,19 @@ function ArrivalScreen({ rules, itemStates, ctx, onAction, setup }) {
           {items.map((r) => {
             const isOpen = expandedItem === r.id;
             const isAttention = itemStates[r.id] === S.NEEDS_ATTENTION;
-            const dotColor = r.riskWeight === "high" ? MF.amber : r.riskWeight === "medium" ? MF.secondary : MF.border;
+            const isComp = (r.itemType || "task") === "compliance";
+            const dotColor = isComp ? MF.compliance : r.riskWeight === "high" ? MF.amber : r.riskWeight === "medium" ? MF.secondary : MF.border;
 
+            const isConfirming = justConfirmed === r.id;
             return (
               <div key={r.id} style={{
-                background: MF.card,
-                border: `1px solid ${isAttention ? MF.amber + "4D" : MF.border}`,
-                borderLeft: `3px solid ${isAttention ? MF.amber : MF.accentMid}`,
+                background: isConfirming ? MF.greenDim : MF.card,
+                border: `1px solid ${isConfirming ? MF.green + "60" : isAttention ? MF.amber + "4D" : isComp ? MF.compliance + "40" : MF.border}`,
+                borderLeft: `3px solid ${isConfirming ? MF.green : isAttention ? MF.amber : isComp ? MF.compliance : MF.accentMid}`,
                 borderRadius: MF.radius, overflow: "hidden",
+                transition: "all 0.3s ease",
+                transform: isConfirming ? "scale(0.98)" : "scale(1)",
+                opacity: isConfirming ? 0.85 : 1,
               }}>
                 <button
                   onClick={() => setExpandedItem(isOpen ? null : r.id)}
@@ -2723,29 +2804,32 @@ function ArrivalScreen({ rules, itemStates, ctx, onAction, setup }) {
                     cursor: "pointer", fontFamily: MF.font, textAlign: "left",
                   }}
                 >
-                  <div style={{ width: "8px", height: "8px", borderRadius: "50%", flexShrink: 0, background: dotColor }} />
+                  <div style={{ width: "8px", height: "8px", borderRadius: isComp ? "2px" : "50%", flexShrink: 0, background: isConfirming ? MF.green : dotColor, transition: "background 0.2s ease" }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: "14px", fontWeight: 600, color: MF.text }}>{r.label}</div>
-                    <div style={{ fontSize: "11px", color: MF.textMuted, marginTop: "1px" }}>{r.roleContext}</div>
+                    <div style={{ fontSize: "11px", color: isComp ? MF.compliance : MF.textMuted, marginTop: "1px", fontWeight: isComp ? 500 : 400 }}>
+                      {isComp ? `Required — ${r.roleContext.charAt(0).toLowerCase() + r.roleContext.slice(1)}` : r.roleContext}
+                    </div>
                   </div>
-                  {isAttention && <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: MF.amber, flexShrink: 0 }} />}
+                  {isComp && <span style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.05em", color: MF.compliance, padding: "2px 6px", borderRadius: "4px", border: `1px solid ${MF.compliance}40`, background: MF.complianceDim }}>REQ</span>}
+                  {isAttention && !isComp && <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: MF.amber, flexShrink: 0 }} />}
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={MF.textMuted} strokeWidth="2" strokeLinecap="round" style={{
                     transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
                     transition: "transform 0.2s ease", opacity: 0.4, flexShrink: 0,
                   }}><polyline points="6 9 12 15 18 9"/></svg>
                 </button>
 
-                {isOpen && (
+                {isOpen && !isConfirming && (
                   <div style={{ padding: "0 12px 12px", animation: "fadeIn 0.15s ease" }}>
                     <div style={{ fontSize: "13px", color: MF.textMuted, lineHeight: 1.5, marginBottom: "10px" }}>
                       {r.description}
                     </div>
                     <div style={{ display: "flex", gap: "6px" }}>
-                      <button style={btn(MF.green, MF.greenDim)} onClick={() => { onAction(r.id, S.CONFIRMED); setExpandedItem(null); }}>
-                        Got it
+                      <button style={btn(MF.green, MF.greenDim)} onClick={() => handleConfirm(r.id, S.CONFIRMED)}>
+                        Noted
                       </button>
-                      <button style={btn(MF.amber, MF.amberDim)} onClick={() => { onAction(r.id, S.NEEDS_ATTENTION); setExpandedItem(null); }}>
-                        Flag this
+                      <button style={btn(MF.amber, MF.amberDim)} onClick={() => handleConfirm(r.id, S.NEEDS_ATTENTION)}>
+                        Needs attention
                       </button>
                     </div>
                   </div>
@@ -2773,6 +2857,11 @@ function ArrivalScreen({ rules, itemStates, ctx, onAction, setup }) {
 function LaterTodayScreen({ rules, itemStates, setup, ctx, onAction }) {
   const [expandedItem, setExpandedItem] = useState(null);
   const [showAll, setShowAll] = useState(false);
+  const [justConfirmed, setJustConfirmed] = useState(null);
+  const handleConfirm = (ruleId, state) => {
+    setJustConfirmed(ruleId);
+    setTimeout(() => { onAction(ruleId, state); setExpandedItem(null); setJustConfirmed(null); }, 400);
+  };
   const MAX_SHOWN = 5;
 
   const laterItems = rules.filter((r) => {
@@ -2806,12 +2895,19 @@ function LaterTodayScreen({ rules, itemStates, setup, ctx, onAction }) {
           {shown.map((r) => {
             const isOpen = expandedItem === r.id;
             const win = resolveWindow(r, setup);
-            const dotColor = r.riskWeight === "high" ? MF.amber : r.riskWeight === "medium" ? MF.secondary : MF.border;
+            const isComp = (r.itemType || "task") === "compliance";
+            const dotColor = isComp ? MF.compliance : r.riskWeight === "high" ? MF.amber : r.riskWeight === "medium" ? MF.secondary : MF.border;
+            const isConfirming = justConfirmed === r.id;
             return (
               <div key={r.id} style={{
-                background: MF.card, border: `1px solid ${MF.border}`,
+                background: isConfirming ? MF.greenDim : MF.card,
+                border: `1px solid ${isConfirming ? MF.green + "60" : isComp ? MF.compliance + "40" : MF.border}`,
+                borderLeft: isComp ? `3px solid ${isConfirming ? MF.green : MF.compliance}` : undefined,
                 borderRadius: MF.radius, overflow: "hidden",
                 animation: "slideUp 0.25s ease both",
+                transition: "all 0.3s ease",
+                transform: isConfirming ? "scale(0.98)" : "scale(1)",
+                opacity: isConfirming ? 0.85 : 1,
               }}>
                 {/* Compact row */}
                 <button
@@ -2823,17 +2919,19 @@ function LaterTodayScreen({ rules, itemStates, setup, ctx, onAction }) {
                   }}
                 >
                   <div style={{
-                    width: "8px", height: "8px", borderRadius: "50%", flexShrink: 0,
-                    background: dotColor,
+                    width: "8px", height: "8px", borderRadius: isComp ? "2px" : "50%", flexShrink: 0,
+                    background: isConfirming ? MF.green : dotColor,
+                    transition: "background 0.2s ease",
                   }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: "14px", fontWeight: 600, letterSpacing: "-0.01em", color: MF.text }}>
                       {r.label}
                     </div>
-                    <div style={{ fontSize: "11px", color: MF.textMuted, marginTop: "1px", lineHeight: 1.3 }}>
-                      {r.roleContext}
+                    <div style={{ fontSize: "11px", color: isComp ? MF.compliance : MF.textMuted, marginTop: "1px", lineHeight: 1.3, fontWeight: isComp ? 500 : 400 }}>
+                      {isComp ? `Required — ${r.roleContext.charAt(0).toLowerCase() + r.roleContext.slice(1)}` : r.roleContext}
                     </div>
                   </div>
+                  {isComp && <span style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.05em", color: MF.compliance, padding: "2px 6px", borderRadius: "4px", border: `1px solid ${MF.compliance}40`, background: MF.complianceDim }}>REQ</span>}
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={MF.textMuted} strokeWidth="2" strokeLinecap="round" style={{
                     transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
                     transition: "transform 0.2s ease", opacity: 0.4, flexShrink: 0,
@@ -2841,7 +2939,7 @@ function LaterTodayScreen({ rules, itemStates, setup, ctx, onAction }) {
                 </button>
 
                 {/* Expanded detail */}
-                {isOpen && (
+                {isOpen && !isConfirming && (
                   <div style={{ padding: "0 16px 14px", animation: "fadeIn 0.15s ease" }}>
                     <div style={{ fontSize: "13px", color: MF.textMuted, lineHeight: 1.6, marginBottom: "8px" }}>
                       {r.description}
@@ -2851,7 +2949,7 @@ function LaterTodayScreen({ rules, itemStates, setup, ctx, onAction }) {
                     </div>
                     <button
                       style={btn(MF.secondary, MF.secondaryDim)}
-                      onClick={() => { onAction(r.id, S.HANDLED_EARLY); setExpandedItem(null); }}
+                      onClick={() => handleConfirm(r.id, S.HANDLED_EARLY)}
                     >
                       Mark handled early
                     </button>
@@ -2895,6 +2993,11 @@ function LaterTodayScreen({ rules, itemStates, setup, ctx, onAction }) {
 // GET AHEAD
 function GetAheadScreen({ rules, itemStates, ctx, onAction, queueState }) {
   const [expandedItem, setExpandedItem] = useState(null);
+  const [justConfirmed, setJustConfirmed] = useState(null);
+  const handleConfirm = (ruleId, state) => {
+    setJustConfirmed(ruleId);
+    setTimeout(() => { onAction(ruleId, state); setExpandedItem(null); setJustConfirmed(null); }, 400);
+  };
 
   const eligible = rules.filter((r) =>
     r.getAheadEligible && ![S.CONFIRMED, S.HANDLED_EARLY, S.NOT_APPLICABLE].includes(itemStates[r.id])
@@ -2926,11 +3029,16 @@ function GetAheadScreen({ rules, itemStates, ctx, onAction, queueState }) {
         <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
           {eligible.map((r) => {
             const isOpen = expandedItem === r.id;
+            const isConfirming = justConfirmed === r.id;
             return (
               <div key={r.id} style={{
-                background: MF.card, border: `1px solid ${MF.border}`,
+                background: isConfirming ? MF.greenDim : MF.card,
+                border: `1px solid ${isConfirming ? MF.green + "60" : MF.border}`,
                 borderRadius: MF.radius, overflow: "hidden",
                 animation: "slideUp 0.25s ease both",
+                transition: "all 0.3s ease",
+                transform: isConfirming ? "scale(0.98)" : "scale(1)",
+                opacity: isConfirming ? 0.85 : 1,
               }}>
                 {/* Compact row */}
                 <button
@@ -2943,7 +3051,8 @@ function GetAheadScreen({ rules, itemStates, ctx, onAction, queueState }) {
                 >
                   <div style={{
                     width: "8px", height: "8px", borderRadius: "50%", flexShrink: 0,
-                    background: MF.border,
+                    background: isConfirming ? MF.green : MF.border,
+                    transition: "background 0.2s ease",
                   }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: "14px", fontWeight: 600, letterSpacing: "-0.01em", color: MF.text }}>
@@ -2960,16 +3069,16 @@ function GetAheadScreen({ rules, itemStates, ctx, onAction, queueState }) {
                 </button>
 
                 {/* Expanded detail */}
-                {isOpen && (
+                {isOpen && !isConfirming && (
                   <div style={{ padding: "0 16px 14px", animation: "fadeIn 0.15s ease" }}>
                     <div style={{ fontSize: "13px", color: MF.textMuted, lineHeight: 1.6, marginBottom: "12px" }}>
                       {r.description}
                     </div>
                     <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-                      <button style={btn(MF.accent, MF.accentDim)} onClick={() => { onAction(r.id, S.HANDLED_EARLY); setExpandedItem(null); }}>
+                      <button style={btn(MF.accent, MF.accentDim)} onClick={() => handleConfirm(r.id, S.HANDLED_EARLY)}>
                         Get a head start
                       </button>
-                      <button style={btn(MF.textMuted, "rgba(139,148,158,0.08)")} onClick={() => { onAction(r.id, S.NOT_APPLICABLE); setExpandedItem(null); }}>
+                      <button style={btn(MF.textMuted, MF.mutedBg)} onClick={() => handleConfirm(r.id, S.NOT_APPLICABLE)}>
                         Skip for today
                       </button>
                     </div>
@@ -2989,6 +3098,11 @@ function ExitScreen({ rules, itemStates, ctx, setup, onAction, vaccineCount }) {
   const [expandedItem, setExpandedItem] = useState(null);
   const [showPassed, setShowPassed] = useState(false);
   const [showCovered, setShowCovered] = useState(false);
+  const [justConfirmed, setJustConfirmed] = useState(null);
+  const handleConfirm = (ruleId, state) => {
+    setJustConfirmed(ruleId);
+    setTimeout(() => { onAction(ruleId, state); setExpandedItem(null); setJustConfirmed(null); }, 400);
+  };
   const scenario = getHandoffScenario(setup);
 
   const unresolved = rules.filter((r) =>
@@ -3096,14 +3210,19 @@ function ExitScreen({ rules, itemStates, ctx, setup, onAction, vaccineCount }) {
           {unresolved.map((r) => {
             const isOpen = expandedItem === r.id;
             const isAttention = itemStates[r.id] === S.NEEDS_ATTENTION;
-            const dotColor = r.riskWeight === "high" ? MF.amber : r.riskWeight === "medium" ? MF.secondary : MF.border;
+            const isComp = (r.itemType || "task") === "compliance";
+            const dotColor = isComp ? MF.compliance : r.riskWeight === "high" ? MF.amber : r.riskWeight === "medium" ? MF.secondary : MF.border;
 
+            const isConfirming = justConfirmed === r.id;
             return (
               <div key={r.id} style={{
-                background: MF.card,
-                border: `1px solid ${isAttention ? MF.amber + "4D" : MF.border}`,
-                borderLeft: `3px solid ${isAttention ? MF.amber : MF.accentMid}`,
+                background: isConfirming ? MF.greenDim : MF.card,
+                border: `1px solid ${isConfirming ? MF.green + "60" : isAttention ? MF.amber + "4D" : isComp ? MF.compliance + "40" : MF.border}`,
+                borderLeft: `3px solid ${isConfirming ? MF.green : isAttention ? MF.amber : isComp ? MF.compliance : MF.accentMid}`,
                 borderRadius: MF.radius, overflow: "hidden",
+                transition: "all 0.3s ease",
+                transform: isConfirming ? "scale(0.98)" : "scale(1)",
+                opacity: isConfirming ? 0.85 : 1,
               }}>
                 <button
                   onClick={() => setExpandedItem(isOpen ? null : r.id)}
@@ -3113,27 +3232,30 @@ function ExitScreen({ rules, itemStates, ctx, setup, onAction, vaccineCount }) {
                     cursor: "pointer", fontFamily: MF.font, textAlign: "left",
                   }}
                 >
-                  <div style={{ width: "8px", height: "8px", borderRadius: "50%", flexShrink: 0, background: dotColor }} />
+                  <div style={{ width: "8px", height: "8px", borderRadius: isComp ? "2px" : "50%", flexShrink: 0, background: isConfirming ? MF.green : dotColor, transition: "background 0.2s ease" }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: "14px", fontWeight: 600, color: MF.text }}>{r.label}</div>
-                    <div style={{ fontSize: "11px", color: MF.textMuted, marginTop: "1px" }}>{r.roleContext}</div>
+                    <div style={{ fontSize: "11px", color: isComp ? MF.compliance : MF.textMuted, marginTop: "1px", fontWeight: isComp ? 500 : 400 }}>
+                      {isComp ? `Required — ${r.roleContext.charAt(0).toLowerCase() + r.roleContext.slice(1)}` : r.roleContext}
+                    </div>
                   </div>
+                  {isComp && <span style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.05em", color: MF.compliance, padding: "2px 6px", borderRadius: "4px", border: `1px solid ${MF.compliance}40`, background: MF.complianceDim }}>REQ</span>}
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={MF.textMuted} strokeWidth="2" strokeLinecap="round" style={{
                     transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
                     transition: "transform 0.2s ease", opacity: 0.4, flexShrink: 0,
                   }}><polyline points="6 9 12 15 18 9"/></svg>
                 </button>
 
-                {isOpen && (
+                {isOpen && !isConfirming && (
                   <div style={{ padding: "0 12px 12px", animation: "fadeIn 0.15s ease" }}>
                     <div style={{ fontSize: "13px", color: MF.textMuted, lineHeight: 1.5, marginBottom: "10px" }}>
                       {r.description}
                     </div>
                     <div style={{ display: "flex", gap: "6px" }}>
-                      <button style={btn(MF.green, MF.greenDim)} onClick={() => { onAction(r.id, S.CONFIRMED); setExpandedItem(null); }}>
+                      <button style={btn(MF.green, MF.greenDim)} onClick={() => handleConfirm(r.id, S.CONFIRMED)}>
                         {scenario.isSolo || scenario.isCloser ? "Resolved" : "Covered"}
                       </button>
-                      <button style={btn(MF.amber, MF.amberDim)} onClick={() => { onAction(r.id, S.NEEDS_ATTENTION); setExpandedItem(null); }}>
+                      <button style={btn(MF.amber, MF.amberDim)} onClick={() => handleConfirm(r.id, S.NEEDS_ATTENTION)}>
                         {scenario.isSolo || scenario.isCloser ? "Needs follow-up" : "Mention this"}
                       </button>
                     </div>
@@ -3178,11 +3300,13 @@ function ExitScreen({ rules, itemStates, ctx, setup, onAction, vaccineCount }) {
         <div style={{ marginTop: "8px", display: "flex", flexDirection: "column", gap: "4px" }}>
           {stillOpenExit.map((r) => {
             const isOpen = expandedItem === `passed-${r.id}`;
-            const dotColor = r.riskWeight === "high" ? MF.amber : r.riskWeight === "medium" ? MF.secondary : MF.border;
+            const isComp = (r.itemType || "task") === "compliance";
+            const dotColor = isComp ? MF.compliance : r.riskWeight === "high" ? MF.amber : r.riskWeight === "medium" ? MF.secondary : MF.border;
             return (
               <div key={r.id} style={{
-                background: MF.card, border: `1px solid ${MF.border}`,
-                borderLeft: `3px solid ${MF.amber}`,
+                background: MF.card,
+                border: `1px solid ${isComp ? MF.compliance + "40" : MF.border}`,
+                borderLeft: `3px solid ${isComp ? MF.compliance : MF.amber}`,
                 borderRadius: MF.radius, overflow: "hidden",
               }}>
                 <button
@@ -3193,11 +3317,14 @@ function ExitScreen({ rules, itemStates, ctx, setup, onAction, vaccineCount }) {
                     cursor: "pointer", fontFamily: MF.font, textAlign: "left",
                   }}
                 >
-                  <div style={{ width: "8px", height: "8px", borderRadius: "50%", flexShrink: 0, background: dotColor }} />
+                  <div style={{ width: "8px", height: "8px", borderRadius: isComp ? "2px" : "50%", flexShrink: 0, background: dotColor }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: "14px", fontWeight: 600, color: MF.text }}>{r.label}</div>
-                    <div style={{ fontSize: "11px", color: MF.textMuted, marginTop: "1px", lineHeight: 1.3 }}>{r.roleContext}</div>
+                    <div style={{ fontSize: "11px", color: isComp ? MF.compliance : MF.textMuted, marginTop: "1px", lineHeight: 1.3, fontWeight: isComp ? 500 : 400 }}>
+                      {isComp ? `Required — ${r.roleContext.charAt(0).toLowerCase() + r.roleContext.slice(1)}` : r.roleContext}
+                    </div>
                   </div>
+                  {isComp && <span style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.05em", color: MF.compliance, padding: "2px 6px", borderRadius: "4px", border: `1px solid ${MF.compliance}40`, background: MF.complianceDim }}>REQ</span>}
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={MF.textMuted} strokeWidth="2" strokeLinecap="round" style={{
                     transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
                     transition: "transform 0.2s ease", opacity: 0.4, flexShrink: 0,
@@ -3208,7 +3335,7 @@ function ExitScreen({ rules, itemStates, ctx, setup, onAction, vaccineCount }) {
                     <div style={{ fontSize: "13px", color: MF.textMuted, lineHeight: 1.6, marginBottom: "12px" }}>{r.description}</div>
                     <div style={{ display: "flex", gap: "6px" }}>
                       <button style={btn(MF.green, MF.greenDim)} onClick={() => { onAction(r.id, S.CONFIRMED); setExpandedItem(null); }}>Handled</button>
-                      <button style={btn(MF.textMuted, "rgba(139,148,158,0.08)")} onClick={() => { onAction(r.id, S.NOT_APPLICABLE); setExpandedItem(null); }}>Skip</button>
+                      <button style={btn(MF.textMuted, MF.mutedBg)} onClick={() => { onAction(r.id, S.NOT_APPLICABLE); setExpandedItem(null); }}>Skip</button>
                     </div>
                   </div>
                 )}
@@ -3309,7 +3436,7 @@ function TimeSimulator({ simTime, onSimTimeChange, onClose, onReset, shiftStart,
             key={p.label}
             onClick={() => onSimTimeChange(p.min)}
             style={{
-              ...btn(simTime === p.min ? "#fff" : MF.textMuted, simTime === p.min ? MF.accent : "rgba(139,148,158,0.08)"),
+              ...btn(simTime === p.min ? "#fff" : MF.textMuted, simTime === p.min ? MF.accent : MF.mutedBg),
               fontSize: "11px", padding: "5px 10px",
             }}
           >
@@ -3321,7 +3448,7 @@ function TimeSimulator({ simTime, onSimTimeChange, onClose, onReset, shiftStart,
         <button
           onClick={onReset}
           style={{
-            ...btn(MF.textMuted, "rgba(139,148,158,0.08)"),
+            ...btn(MF.textMuted, MF.mutedBg),
             width: "100%", marginTop: "10px", fontSize: "11px", textAlign: "center",
           }}
         >
@@ -3522,6 +3649,7 @@ export default function RxTempo() {
     select option { background: ${MF.selectBg}; color: ${MF.selectText}; }
     ::-webkit-scrollbar { width: 3px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: ${MF.border}; border-radius: 3px; }
     button:active { transform: scale(0.97); }
+    button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid ${MF.accent}; outline-offset: 2px; }
     input[type="range"] { height: 4px; }
   `;
 
