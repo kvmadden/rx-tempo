@@ -1681,10 +1681,20 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
   const [expandedItem, setExpandedItem] = useState(null);
   const [showStillOpen, setShowStillOpen] = useState(false);
   const [showCovered, setShowCovered] = useState(false);
+  const [showAllVisible, setShowAllVisible] = useState(false);
+
+  const WEIGHT_RANK = { high: 0, medium: 1, low: 2 };
+  const MAX_SHOWN = 4;
 
   const visible = rules.filter((r) =>
     [S.VISIBLE, S.NEEDS_ATTENTION, S.VISIBLE_HANDOFF].includes(itemStates[r.id])
-  );
+  ).sort((a, b) => {
+    // Needs attention first, then by risk weight
+    const aAttn = itemStates[a.id] === S.NEEDS_ATTENTION ? 0 : 1;
+    const bAttn = itemStates[b.id] === S.NEEDS_ATTENTION ? 0 : 1;
+    if (aAttn !== bAttn) return aAttn - bAttn;
+    return (WEIGHT_RANK[a.riskWeight] || 2) - (WEIGHT_RANK[b.riskWeight] || 2);
+  });
   const confirmed = rules.filter((r) =>
     [S.CONFIRMED, S.HANDLED_EARLY].includes(itemStates[r.id])
   );
@@ -1815,9 +1825,12 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
       </div>
 
       {/* Visible items — compact rows with expand */}
-      {visible.length > 0 && (
-        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-          {visible.map((r) => {
+      {visible.length > 0 && (() => {
+        const shown = showAllVisible ? visible : visible.slice(0, MAX_SHOWN);
+        const hiddenCount = visible.length - MAX_SHOWN;
+        return (
+        <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+          {shown.map((r) => {
             const isOpen = expandedItem === r.id;
             const st = itemStates[r.id];
             const isAttention = st === S.NEEDS_ATTENTION;
@@ -1842,8 +1855,8 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
                 <button
                   onClick={() => setExpandedItem(isOpen ? null : r.id)}
                   style={{
-                    width: "100%", display: "flex", alignItems: "center", gap: "10px",
-                    padding: "14px 16px", background: "none", border: "none",
+                    width: "100%", display: "flex", alignItems: "center", gap: "8px",
+                    padding: "10px 12px", background: "none", border: "none",
                     cursor: "pointer", fontFamily: MF.font, textAlign: "left",
                   }}
                 >
@@ -1852,10 +1865,10 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
                     background: dotColor,
                   }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: "15px", fontWeight: 600, color: MF.text, letterSpacing: "-0.01em" }}>
+                    <div style={{ fontSize: "14px", fontWeight: 600, color: MF.text, letterSpacing: "-0.01em" }}>
                       {r.label}
                     </div>
-                    <div style={{ fontSize: "12px", color: MF.textMuted, marginTop: "2px", lineHeight: 1.3 }}>
+                    <div style={{ fontSize: "11px", color: MF.textMuted, marginTop: "1px", lineHeight: 1.3 }}>
                       {r.roleContext}
                     </div>
                   </div>
@@ -1896,8 +1909,35 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
               </div>
             );
           })}
+          {!showAllVisible && hiddenCount > 0 && (
+            <button
+              onClick={() => setShowAllVisible(true)}
+              style={{
+                width: "100%", padding: "10px", marginTop: "2px",
+                fontSize: "12px", fontWeight: 600, color: MF.textMuted,
+                background: "transparent", border: `1px dashed ${MF.border}`,
+                borderRadius: MF.radiusSm, cursor: "pointer", fontFamily: MF.font,
+              }}
+            >
+              {hiddenCount} more items
+            </button>
+          )}
+          {showAllVisible && visible.length > MAX_SHOWN && (
+            <button
+              onClick={() => setShowAllVisible(false)}
+              style={{
+                width: "100%", padding: "8px", marginTop: "2px",
+                fontSize: "11px", color: MF.textMuted, opacity: 0.6,
+                background: "transparent", border: "none",
+                cursor: "pointer", fontFamily: MF.font,
+              }}
+            >
+              Show less
+            </button>
+          )}
         </div>
-      )}
+        );
+      })()}
 
       {/* Summary chips */}
       {(() => {
