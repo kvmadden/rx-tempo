@@ -4080,7 +4080,7 @@ function RxTempoApp() {
       </div>
 
       {/* ── BOTTOM NAV ── */}
-      <div style={{
+      <nav aria-label="Main navigation" style={{
         borderTop: `1px solid ${MF.border}`, background: MF.navBg,
         backdropFilter: "blur(12px)", position: "sticky", bottom: 0, zIndex: 100,
         paddingBottom: "env(safe-area-inset-bottom)",
@@ -4098,6 +4098,7 @@ function RxTempoApp() {
           return (
             <button
               key={tab.key}
+              aria-current={isActive ? "page" : undefined}
               onClick={() => setScreen(tab.key)}
               style={{
                 background: "none", border: "none", cursor: "pointer",
@@ -4132,7 +4133,7 @@ function RxTempoApp() {
           );
         })}
         </div>
-      </div>
+      </nav>
     </div>
   );
 }
