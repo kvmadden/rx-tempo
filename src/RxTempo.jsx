@@ -1969,7 +1969,7 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
 
       {/* ── Workflow status — full-width segmented control ── */}
       {onQueueState && setup.guidance !== "minimal" && (
-        <div style={{
+        <div role="group" aria-label="Workflow status" style={{
           display: "flex", gap: "0",
           marginBottom: "10px",
           border: `1px solid ${MF.border}`,
@@ -1984,6 +1984,7 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
           ].map((q, i) => (
             <button
               key={q.key}
+              aria-pressed={queueState === q.key}
               onClick={() => onQueueState(q.key)}
               style={{
                 flex: 1, padding: "8px 4px", fontSize: "11px", fontWeight: 600,
@@ -2587,6 +2588,7 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
         return (
         <div style={{ marginTop: "8px" }}>
           <button
+            aria-expanded={isExpanded}
             onClick={() => setImmExpanded(!immExpanded)}
             style={{
               width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center",
