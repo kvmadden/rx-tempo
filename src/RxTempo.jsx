@@ -416,6 +416,16 @@ const S = {
 // Higher number = more pressure. Checks resurface when pressure increases.
 const PRESSURE_RANK = { clear: 0, ontrack: 1, needsfocus: 2, highdemand: 3 };
 
+// Timing constants
+const CONFIRM_FLASH_MS = 400;
+const FIRST_CONFIRM_FLASH_MS = 600;
+const AUTO_RETURN_MS = 600;
+const STREAK_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+const AUTO_EXPIRE_MS = 24 * 60 * 60 * 1000; // 24 hours
+const TICK_INTERVAL_MS = 30000; // 30 seconds
+const WEIGHT_RANK = { high: 0, medium: 1, low: 2 };
+const TYPE_RANK = { compliance: 0, task: 1, check: 2 };
+
 function deriveContext(setup, now) {
   if (!setup) return null;
   const { shiftStart, shiftEnd, storeOpen, storeClose, overlapWindows } = setup;
@@ -1837,41 +1847,38 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
   const [confirmSkipCompliance, setConfirmSkipCompliance] = useState(null); // ruleId being skip-confirmed
   const confirmTimerRef = useRef(null);
 
-  const WEIGHT_RANK = { high: 0, medium: 1, low: 2 };
   const MAX_SHOWN = 4;
-
   const isPIC = setup.role === "pharmacist-manager";
-  const TYPE_RANK = { compliance: 0, task: 1, check: 2 };
-  const visible = rules.filter((r) =>
-    [S.VISIBLE, S.NEEDS_ATTENTION, S.VISIBLE_HANDOFF].includes(itemStates[r.id])
-  ).sort((a, b) => {
-    // Needs attention first
-    const aAttn = itemStates[a.id] === S.NEEDS_ATTENTION ? 0 : 1;
-    const bAttn = itemStates[b.id] === S.NEEDS_ATTENTION ? 0 : 1;
-    if (aAttn !== bAttn) return aAttn - bAttn;
-    // PIC/PM: compliance items float to top (accountability)
-    if (isPIC) {
-      const aType = (TYPE_RANK[a.itemType] ?? 1);
-      const bType = (TYPE_RANK[b.itemType] ?? 1);
-      if (aType !== bType) return aType - bType;
-    }
-    // Then by risk weight
-    return (WEIGHT_RANK[a.riskWeight] || 2) - (WEIGHT_RANK[b.riskWeight] || 2);
-  });
-  const confirmed = rules.filter((r) =>
-    [S.CONFIRMED, S.HANDLED_EARLY].includes(itemStates[r.id])
-  );
 
-  // Total actionable items (not get-ahead, not shift-suppressed)
-  const shiftType = setup.shiftType || "open-close";
-  const suppressOpening = shiftType === "mid" || shiftType === "mid-close" || shiftType === "overnight";
-  const suppressDeadline = shiftType === "open-mid";
-  const totalActionable = rules.filter((r) => {
-    if (r.category === "getahead") return false;
-    if (suppressOpening && r.category === "opening") return false;
-    if (suppressDeadline && (r.category === "deadline" || r.category === "exit")) return false;
-    return true;
-  }).length;
+  const { visible, confirmed, totalActionable } = useMemo(() => {
+    const vis = rules.filter((r) =>
+      [S.VISIBLE, S.NEEDS_ATTENTION, S.VISIBLE_HANDOFF].includes(itemStates[r.id])
+    ).sort((a, b) => {
+      const aAttn = itemStates[a.id] === S.NEEDS_ATTENTION ? 0 : 1;
+      const bAttn = itemStates[b.id] === S.NEEDS_ATTENTION ? 0 : 1;
+      if (aAttn !== bAttn) return aAttn - bAttn;
+      if (isPIC) {
+        const aType = (TYPE_RANK[a.itemType] ?? 1);
+        const bType = (TYPE_RANK[b.itemType] ?? 1);
+        if (aType !== bType) return aType - bType;
+      }
+      return (WEIGHT_RANK[a.riskWeight] || 2) - (WEIGHT_RANK[b.riskWeight] || 2);
+    });
+    const conf = rules.filter((r) =>
+      [S.CONFIRMED, S.HANDLED_EARLY].includes(itemStates[r.id])
+    );
+    const st = setup.shiftType || "open-close";
+    const suppOpen = st === "mid" || st === "mid-close" || st === "overnight";
+    const suppDeadline = st === "open-mid";
+    const total = rules.filter((r) => {
+      if (r.category === "getahead") return false;
+      if (suppOpen && r.category === "opening") return false;
+      if (suppDeadline && (r.category === "deadline" || r.category === "exit")) return false;
+      return true;
+    }).length;
+    return { visible: vis, confirmed: conf, totalActionable: total };
+  }, [rules, itemStates, isPIC, setup.shiftType]);
+
   const coveredCount = confirmed.length;
   const completionPct = totalActionable > 0 ? (coveredCount / totalActionable) * 100 : 0;
 
@@ -1881,7 +1888,7 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
   const showSummary = guidanceLevel === "full";
 
   // Streak detection — 3+ confirms within 15 minutes
-  const recentConfirms = confirmTimestamps.filter((t) => Date.now() - t < 15 * 60 * 1000);
+  const recentConfirms = confirmTimestamps.filter((t) => Date.now() - t < STREAK_WINDOW_MS);
   const onAStreak = showEncouragement && recentConfirms.length >= 3;
 
   useEffect(() => () => { if (confirmTimerRef.current) clearTimeout(confirmTimerRef.current); }, []);
@@ -1890,8 +1897,8 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
     if (confirmTimerRef.current) clearTimeout(confirmTimerRef.current);
     setJustConfirmed(ruleId);
     const now = Date.now();
-    setConfirmTimestamps((prev) => [...prev.filter((t) => now - t < 15 * 60 * 1000), now]);
-    const flashDuration = isFirstConfirm ? 600 : 400;
+    setConfirmTimestamps((prev) => [...prev.filter((t) => now - t < STREAK_WINDOW_MS), now]);
+    const flashDuration = isFirstConfirm ? FIRST_CONFIRM_FLASH_MS : CONFIRM_FLASH_MS;
     confirmTimerRef.current = setTimeout(() => {
       onAction(ruleId, S.CONFIRMED);
       setExpandedItem(null);
@@ -1903,8 +1910,8 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
   // Items whose window has passed without being actioned
   const stillOpen = getStillOpenItems(rules, itemStates, setup, ctx);
 
-  const visibleTasks = visible.filter((r) => !isCheckItem(r)).length;
   const visibleChecks = visible.filter(isCheckItem).length;
+  const visibleTasks = visible.length - visibleChecks;
   const pacingLine = getPacingLine(ctx, visible.length, ctx.coverageMode, queueState, coveredCount, totalActionable, visibleTasks, visibleChecks);
   const phaseLabel = getPhaseLabel(ctx);
   const highPressure = visible.length > 5 || queueState === "highdemand" || queueState === "needsfocus";
@@ -2464,7 +2471,7 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
                         <button style={btn(MF.amber, MF.amberDim)} onClick={() => { onAction(r.id, S.NEEDS_ATTENTION); setExpandedItem(null); }}>
                           Still needs attention
                         </button>
-                        <button style={btn(MF.textMuted, MF.mutedBg)} onClick={() => { isComp ? setConfirmSkipCompliance(`still-${r.id}`) : (() => { onAction(r.id, S.NOT_APPLICABLE); setExpandedItem(null); })(); }}>
+                        <button style={btn(MF.textMuted, MF.mutedBg)} onClick={() => { if (isComp) { setConfirmSkipCompliance(`still-${r.id}`); } else { onAction(r.id, S.NOT_APPLICABLE); setExpandedItem(null); } }}>
                           Skip for today
                         </button>
                       </div>
@@ -2730,7 +2737,7 @@ function ArrivalScreen({ rules, itemStates, ctx, onAction, setup }) {
   const handleConfirm = (ruleId, state) => {
     if (timerRef.current) clearTimeout(timerRef.current);
     setJustConfirmed(ruleId);
-    timerRef.current = setTimeout(() => { onAction(ruleId, state); setExpandedItem(null); setJustConfirmed(null); timerRef.current = null; }, 400);
+    timerRef.current = setTimeout(() => { onAction(ruleId, state); setExpandedItem(null); setJustConfirmed(null); timerRef.current = null; }, CONFIRM_FLASH_MS);
   };
   const scenario = getHandoffScenario(setup);
   const items = rules.filter((r) =>
@@ -2891,7 +2898,7 @@ function LaterTodayScreen({ rules, itemStates, setup, ctx, onAction }) {
   const handleConfirm = (ruleId, state) => {
     if (timerRef.current) clearTimeout(timerRef.current);
     setJustConfirmed(ruleId);
-    timerRef.current = setTimeout(() => { onAction(ruleId, state); setExpandedItem(null); setJustConfirmed(null); timerRef.current = null; }, 400);
+    timerRef.current = setTimeout(() => { onAction(ruleId, state); setExpandedItem(null); setJustConfirmed(null); timerRef.current = null; }, CONFIRM_FLASH_MS);
   };
   const MAX_SHOWN = 5;
 
@@ -3028,7 +3035,7 @@ function GetAheadScreen({ rules, itemStates, ctx, onAction, queueState }) {
   const handleConfirm = (ruleId, state) => {
     if (timerRef.current) clearTimeout(timerRef.current);
     setJustConfirmed(ruleId);
-    timerRef.current = setTimeout(() => { onAction(ruleId, state); setExpandedItem(null); setJustConfirmed(null); timerRef.current = null; }, 400);
+    timerRef.current = setTimeout(() => { onAction(ruleId, state); setExpandedItem(null); setJustConfirmed(null); timerRef.current = null; }, CONFIRM_FLASH_MS);
   };
 
   const eligible = rules.filter((r) =>
@@ -3134,7 +3141,7 @@ function ExitScreen({ rules, itemStates, ctx, setup, onAction, vaccineCount }) {
   const handleConfirm = (ruleId, state) => {
     if (timerRef.current) clearTimeout(timerRef.current);
     setJustConfirmed(ruleId);
-    timerRef.current = setTimeout(() => { onAction(ruleId, state); setExpandedItem(null); setJustConfirmed(null); timerRef.current = null; }, 400);
+    timerRef.current = setTimeout(() => { onAction(ruleId, state); setExpandedItem(null); setJustConfirmed(null); timerRef.current = null; }, CONFIRM_FLASH_MS);
   };
   const scenario = getHandoffScenario(setup);
 
@@ -3501,7 +3508,7 @@ export default function RxTempo() {
 
   // Tick every 30s (real time)
   useEffect(() => {
-    const iv = setInterval(() => setNow(new Date()), 30000);
+    const iv = setInterval(() => setNow(new Date()), TICK_INTERVAL_MS);
     return () => clearInterval(iv);
   }, []);
 
@@ -3529,7 +3536,7 @@ export default function RxTempo() {
 
   // Auto-expire: 24hr ceiling
   useEffect(() => {
-    if (setup && Date.now() - setup.setupTimestamp > 24 * 60 * 60 * 1000) {
+    if (setup && Date.now() - setup.setupTimestamp > AUTO_EXPIRE_MS) {
       handleReset();
     }
   }, [now, setup, handleReset]);
@@ -3639,7 +3646,7 @@ export default function RxTempo() {
   const handleActionAndReturn = useCallback((ruleId, newState) => {
     handleAction(ruleId, newState);
     if (actionReturnRef.current) clearTimeout(actionReturnRef.current);
-    actionReturnRef.current = setTimeout(() => { setScreen("home"); actionReturnRef.current = null; }, 600);
+    actionReturnRef.current = setTimeout(() => { setScreen("home"); actionReturnRef.current = null; }, AUTO_RETURN_MS);
   }, [handleAction]);
 
   const handleSetup = (data) => {
