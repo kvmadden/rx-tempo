@@ -1219,7 +1219,7 @@ function StartDayScreen({ onComplete }) {
           Confirm your day
         </h1>
         <p style={{ fontSize: "14px", color: MF.textMuted, marginBottom: "20px" }}>
-          Quick check before we go.
+          Quick check before we go. You can adjust once the shift starts.
         </p>
 
         {(() => {
@@ -1484,7 +1484,7 @@ function StartDayScreen({ onComplete }) {
           <>
             <div style={{ marginBottom: "20px" }}>
               <label style={{ fontSize: "12px", fontWeight: 600, color: MF.textMuted, marginBottom: "10px", display: "block", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                Another pharmacist overlapping?
+                Other pharmacist on during your shift?
               </label>
               <button
                 onClick={() => setHasOverlap(hasOverlap === "yes" ? "no" : "yes")}
