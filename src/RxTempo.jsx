@@ -3540,7 +3540,9 @@ function RxTempoApp() {
   const [now, setNow] = useState(new Date());
   const [simMode, setSimMode] = useState(false);
   const [simTime, setSimTime] = useState(null);
-  const [theme, setTheme] = useState("dark");
+  const [theme, setTheme] = useState(() =>
+    typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark"
+  );
   const [showInfo, setShowInfo] = useState(false);
   const [eventArrivals, setEventArrivals] = useState({});
   const [queueState, setQueueState] = useState("ontrack");
@@ -3741,8 +3743,6 @@ function RxTempoApp() {
           @keyframes pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 0.7; } }
           @keyframes gradientShift { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
           @keyframes revealUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-          @keyframes revealScale { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } }
-          @keyframes pulseLine { 0%, 100% { opacity: 0.12; } 50% { opacity: 0.25; } }
           @keyframes scrollLine { from { transform: translateX(0); } to { transform: translateX(-50%); } }
           @keyframes rhythmPulse { 0%, 100% { transform: scaleY(0.75); } 50% { transform: scaleY(1.15); } }
         `}</style>
@@ -4078,6 +4078,7 @@ function RxTempoApp() {
       <div style={{
         borderTop: `1px solid ${MF.border}`, background: MF.navBg,
         backdropFilter: "blur(12px)", position: "sticky", bottom: 0, zIndex: 100,
+        paddingBottom: "env(safe-area-inset-bottom)",
       }}>
         <div style={{
           textAlign: "center", padding: "4px 0 2px",
