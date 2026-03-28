@@ -2284,9 +2284,98 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
   );
 }
 
-// ARRIVAL HANDSHAKE — you're the person coming in
+// ─── HANDOFF SCENARIO DETECTION ───
+// Derives the handoff context from setup data so screens adapt automatically
+function getHandoffScenario(setup) {
+  if (!setup) return { arrivalType: "unknown", exitType: "unknown" };
+
+  const st = setup.shiftType || "open-close";
+  const hasOverlap = setup.overlapWindows && setup.overlapWindows.length > 0;
+  const isOpener = st === "open-close" || st === "open-mid";
+  const isCloser = st === "open-close" || st === "mid-close";
+  const isMid = st === "mid";
+  const isOvernight = st === "overnight";
+  const isSolo = st === "open-close" && !hasOverlap;
+
+  // ARRIVAL scenarios
+  let arrivalType, arrivalLabel, arrivalHeadline, arrivalEmpty;
+  if (isSolo) {
+    arrivalType = "solo-open";
+    arrivalLabel = "Starting fresh";
+    arrivalHeadline = (n) => n === 0 ? "Opening up. You've got it from here." : `${n} things to check as you open.`;
+    arrivalEmpty = { message: "You're opening solo today.", sub: "No handoff needed — check Home for your board." };
+  } else if (isOpener && hasOverlap) {
+    arrivalType = "opener-with-relief";
+    arrivalLabel = "Opening";
+    arrivalHeadline = (n) => n === 0 ? "Clean start. Nothing flagged from overnight." : `${n} things flagged to check.`;
+    arrivalEmpty = { message: "Clean start.", sub: "Nothing flagged. You're good to go." };
+  } else if (isMid) {
+    arrivalType = "mid-arriving";
+    arrivalLabel = "Getting aligned";
+    arrivalHeadline = (n) => n === 0 ? "You're aligned. Nothing to flag." : `${n} things to get aligned on.`;
+    arrivalEmpty = { message: "Nothing specific for the handshake.", sub: "You're aligned. Good to go." };
+  } else if (isCloser && !isOpener) {
+    arrivalType = "closer-arriving";
+    arrivalLabel = "Picking up";
+    arrivalHeadline = (n) => n === 0 ? "All caught up. Nothing to flag." : `${n} things to pick up.`;
+    arrivalEmpty = { message: "Clean pickup.", sub: "Nothing outstanding from earlier." };
+  } else if (isOvernight) {
+    arrivalType = "overnight-arriving";
+    arrivalLabel = "Taking over";
+    arrivalHeadline = (n) => n === 0 ? "Quiet handoff. Nothing flagged." : `${n} things from the day shift.`;
+    arrivalEmpty = { message: "Nothing flagged from the day.", sub: "Quiet start." };
+  } else {
+    arrivalType = "generic";
+    arrivalLabel = "Arriving";
+    arrivalHeadline = (n) => n === 0 ? "You're aligned. Nothing to flag." : `${n} things to get aligned on.`;
+    arrivalEmpty = { message: "Nothing specific for the handshake.", sub: "You're aligned. Good to go." };
+  }
+
+  // EXIT scenarios
+  let exitType, exitLabel, exitHeadline, exitClean;
+  if (isSolo) {
+    exitType = "solo-close";
+    exitLabel = "Closing out";
+    exitHeadline = (n) => n === 0 ? "Everything resolved. Good close." : `${n} things to resolve before you lock up.`;
+    exitClean = (covered) => covered > 0 ? `${covered} items covered. Clean close.` : "All set. Clean close.";
+  } else if (isOpener && hasOverlap && !isCloser) {
+    exitType = "opener-handing-off";
+    exitLabel = "Handing off";
+    exitHeadline = (n) => n === 0 ? "Clean handoff. Nothing unresolved." : `${n} things worth mentioning.`;
+    exitClean = (covered) => covered > 0 ? `${covered} items covered. Thanks for setting the pace.` : "All set. Thanks for setting the pace.";
+  } else if (isMid) {
+    exitType = "mid-handing-off";
+    exitLabel = "Handing off";
+    exitHeadline = (n) => n === 0 ? "Clean handoff. Nothing to pass along." : `${n} things to pass along.`;
+    exitClean = (covered) => covered > 0 ? `${covered} covered. Smooth handoff.` : "Nothing to pass along. Smooth handoff.";
+  } else if (isCloser && hasOverlap && !isOpener) {
+    exitType = "closer-wrapping";
+    exitLabel = "Closing out";
+    exitHeadline = (n) => n === 0 ? "Everything resolved. Good close." : `${n} things to resolve before close.`;
+    exitClean = (covered) => covered > 0 ? `${covered} items covered. Thanks for a solid close.` : "All clear. Good close.";
+  } else if (isOvernight) {
+    exitType = "overnight-handing-off";
+    exitLabel = "Handing off to morning";
+    exitHeadline = (n) => n === 0 ? "Clean handoff for the morning crew." : `${n} things for the morning crew.`;
+    exitClean = (covered) => covered > 0 ? `${covered} covered. Morning crew is set.` : "Morning crew is set. Good night.";
+  } else {
+    exitType = "generic";
+    exitLabel = "Handing off";
+    exitHeadline = (n) => n === 0 ? "Clean handoff. Nothing unresolved." : `${n} things worth mentioning.`;
+    exitClean = (covered) => covered > 0 ? `${covered} items covered. Thanks for a solid shift.` : "All set. Thanks for keeping things steady.";
+  }
+
+  return {
+    arrivalType, arrivalLabel, arrivalHeadline, arrivalEmpty,
+    exitType, exitLabel, exitHeadline, exitClean,
+    isSolo, hasOverlap, isOpener, isCloser, isMid, isOvernight,
+  };
+}
+
+// ARRIVAL HANDSHAKE — adaptive based on shift scenario
 function ArrivalScreen({ rules, itemStates, ctx, onAction, setup }) {
   const [expandedItem, setExpandedItem] = useState(null);
+  const scenario = getHandoffScenario(setup);
   const items = rules.filter((r) =>
     r.handoffEligibility === "arrival" &&
     [S.VISIBLE, S.VISIBLE_HANDOFF, S.NEEDS_ATTENTION].includes(itemStates[r.id])
@@ -2296,17 +2385,35 @@ function ArrivalScreen({ rules, itemStates, ctx, onAction, setup }) {
     [S.CONFIRMED, S.HANDLED_EARLY].includes(itemStates[r.id])
   );
 
+  // Solo shift — no arrival handoff
+  if (scenario.isSolo) {
+    return (
+      <div style={{ padding: "16px", animation: "fadeIn 0.2s ease" }}>
+        <div style={{ fontSize: "12px", color: MF.textMuted, marginBottom: "4px" }}>
+          <span style={{ fontWeight: 600, color: MF.accent }}>{scenario.arrivalLabel}</span>
+          <span style={{ opacity: 0.4 }}> · </span>
+          <span>{fmtTime12(ctx.currentMin)}</span>
+        </div>
+        <div style={{ fontSize: "15px", fontWeight: 600, color: MF.text, marginBottom: "12px" }}>
+          You're covering the full day.
+        </div>
+        <QuietState message="No handoff needed." sub="Check Home for your board." />
+      </div>
+    );
+  }
+
+  // Not in arrival window yet
   if (!ctx.arrivalWindow && items.length === 0) {
     return (
       <div style={{ padding: "16px", animation: "fadeIn 0.2s ease" }}>
         <div style={{ fontSize: "12px", color: MF.textMuted, marginBottom: "12px" }}>
-          <span style={{ fontWeight: 600, color: MF.accent }}>Arrival</span>
+          <span style={{ fontWeight: 600, color: MF.accent }}>{scenario.arrivalLabel}</span>
           <span style={{ opacity: 0.4 }}> · </span>
           <span>{fmtTime12(ctx.currentMin)}</span>
         </div>
         <QuietState
-          message="No active arrival window right now."
-          sub={ctx.inOverlap ? "You're mid-overlap — check Home for the live board." : "This screen activates when an overlap window starts."}
+          message={ctx.inOverlap ? "You're mid-overlap." : "No active arrival window."}
+          sub={ctx.inOverlap ? "Check Home for the live board." : "This screen activates when an overlap window starts."}
         />
       </div>
     );
@@ -2314,37 +2421,35 @@ function ArrivalScreen({ rules, itemStates, ctx, onAction, setup }) {
 
   return (
     <div style={{ padding: "16px", animation: "fadeIn 0.2s ease" }}>
-      {/* Header — compact */}
+      {/* Header */}
       <div style={{ marginBottom: "12px" }}>
         <div style={{ fontSize: "12px", color: MF.textMuted, marginBottom: "4px" }}>
-          <span style={{ fontWeight: 600, color: MF.accent }}>Arriving</span>
+          <span style={{ fontWeight: 600, color: MF.accent }}>{scenario.arrivalLabel}</span>
           <span style={{ opacity: 0.4 }}> · </span>
           <span>{fmtTime12(ctx.currentMin)}</span>
         </div>
         <div style={{ fontSize: "15px", fontWeight: 600, color: MF.text, letterSpacing: "-0.01em" }}>
-          {items.length === 0
-            ? "You're aligned. Nothing to flag."
-            : items.length === 1
-            ? "One thing to get aligned on."
-            : `${items.length} things to get aligned on.`}
+          {scenario.arrivalHeadline(items.length)}
         </div>
       </div>
 
-      {/* Context from outgoing — compact inline */}
-      {setup && setup.dayNotes && setup.dayNotes.length > 0 && (
+      {/* Context from outgoing */}
+      {setup?.dayNotes?.length > 0 && (
         <div style={{
           padding: "8px 12px", marginBottom: "8px",
           border: `1px solid ${MF.border}`, borderRadius: MF.radiusSm,
           fontSize: "12px", color: MF.textMuted, lineHeight: 1.4,
         }}>
-          <span style={{ fontWeight: 600, color: MF.secondary, fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Notes from today</span>
+          <span style={{ fontWeight: 600, color: MF.secondary, fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            {scenario.isOpener ? "Notes from overnight" : "Notes from earlier"}
+          </span>
           {setup.dayNotes.map((n, i) => (
             <div key={i} style={{ marginTop: "4px" }}>{n}</div>
           ))}
         </div>
       )}
 
-      {/* Handoff items — compact expandable rows */}
+      {/* Items — compact expandable rows */}
       {items.length > 0 && (
         <div style={{ display: "flex", flexDirection: "column", gap: "4px", marginBottom: "8px" }}>
           {items.map((r) => {
@@ -2399,6 +2504,9 @@ function ArrivalScreen({ rules, itemStates, ctx, onAction, setup }) {
           })}
         </div>
       )}
+
+      {/* Empty state when all items cleared */}
+      {items.length === 0 && <QuietState {...scenario.arrivalEmpty} />}
 
       {/* Handled count */}
       {handled.length > 0 && (
@@ -2522,11 +2630,12 @@ function GetAheadScreen({ rules, itemStates, ctx, onAction, queueState }) {
   );
 }
 
-// EXIT CHECKPOINT — you're the person leaving
+// EXIT CHECKPOINT — adaptive based on shift scenario
 function ExitScreen({ rules, itemStates, ctx, setup, onAction, vaccineCount }) {
   const [expandedItem, setExpandedItem] = useState(null);
   const [showPassed, setShowPassed] = useState(false);
   const [showCovered, setShowCovered] = useState(false);
+  const scenario = getHandoffScenario(setup);
 
   const unresolved = rules.filter((r) =>
     r.handoffEligibility === "exit" &&
@@ -2545,17 +2654,20 @@ function ExitScreen({ rules, itemStates, ctx, setup, onAction, vaccineCount }) {
     return win.end < ctx.currentMin && win.end > 0;
   });
 
+  const mentionCount = unresolved.length + stillOpenExit.length;
+  const showSnapshot = covered.length > 0 || mentionCount > 0 || (setup?.immTarget > 0 && vaccineCount > 0);
+
   // Not in exit window yet
   if (!ctx.exitWindow) {
     return (
       <div style={{ padding: "16px", animation: "fadeIn 0.2s ease" }}>
         <div style={{ fontSize: "12px", color: MF.textMuted, marginBottom: "12px" }}>
-          <span style={{ fontWeight: 600, color: MF.accent }}>Exit</span>
+          <span style={{ fontWeight: 600, color: MF.accent }}>{scenario.exitLabel}</span>
           <span style={{ opacity: 0.4 }}> · </span>
           <span>{fmtTime12(ctx.currentMin)}</span>
         </div>
         <QuietState
-          message="Not in the exit window yet."
+          message={scenario.isSolo ? "Not time to close yet." : "Not in the exit window yet."}
           sub={`About ${Math.round(ctx.minutesUntilEnd)} minutes until shift end.`}
         />
       </div>
@@ -2567,59 +2679,61 @@ function ExitScreen({ rules, itemStates, ctx, setup, onAction, vaccineCount }) {
       {/* Header */}
       <div style={{ marginBottom: "10px" }}>
         <div style={{ fontSize: "12px", color: MF.textMuted, marginBottom: "4px" }}>
-          <span style={{ fontWeight: 600, color: MF.accent }}>Handing off</span>
+          <span style={{ fontWeight: 600, color: MF.accent }}>{scenario.exitLabel}</span>
           <span style={{ opacity: 0.4 }}> · </span>
           <span>{fmtTime12(ctx.currentMin)}</span>
         </div>
         <div style={{ fontSize: "15px", fontWeight: 600, color: MF.text, letterSpacing: "-0.01em" }}>
-          {unresolved.length === 0 && stillOpenExit.length === 0
-            ? "Clean handoff. Nothing unresolved."
-            : unresolved.length + stillOpenExit.length === 1
-            ? "One thing worth mentioning."
-            : `${unresolved.length + stillOpenExit.length} things worth mentioning.`}
+          {scenario.exitHeadline(mentionCount)}
         </div>
       </div>
 
-      {/* Shift snapshot — compact inline stats */}
-      <div style={{
-        display: "flex", gap: "0", marginBottom: "10px",
-        border: `1px solid ${MF.border}`, borderRadius: MF.radiusSm, overflow: "hidden",
-      }}>
-        {covered.length > 0 && (
-          <div style={{ flex: 1, padding: "8px 0", textAlign: "center", borderRight: `1px solid ${MF.border}` }}>
-            <div style={{ fontSize: "16px", fontWeight: 700, color: MF.green }}>{covered.length}</div>
-            <div style={{ fontSize: "9px", color: MF.textMuted, textTransform: "uppercase", letterSpacing: "0.05em" }}>covered</div>
-          </div>
-        )}
-        {(unresolved.length > 0 || stillOpenExit.length > 0) && (
-          <div style={{ flex: 1, padding: "8px 0", textAlign: "center", borderRight: setup?.immTarget > 0 ? `1px solid ${MF.border}` : "none" }}>
-            <div style={{ fontSize: "16px", fontWeight: 700, color: MF.amber }}>{unresolved.length + stillOpenExit.length}</div>
-            <div style={{ fontSize: "9px", color: MF.textMuted, textTransform: "uppercase", letterSpacing: "0.05em" }}>to mention</div>
-          </div>
-        )}
-        {setup?.immTarget > 0 && vaccineCount !== undefined && (
-          <div style={{ flex: 1, padding: "8px 0", textAlign: "center" }}>
-            <div style={{ fontSize: "16px", fontWeight: 700, color: vaccineCount >= setup.immTarget ? MF.green : MF.accent }}>{vaccineCount}/{setup.immTarget}</div>
-            <div style={{ fontSize: "9px", color: MF.textMuted, textTransform: "uppercase", letterSpacing: "0.05em" }}>vaccines</div>
-          </div>
-        )}
-      </div>
+      {/* Shift snapshot */}
+      {showSnapshot && (
+        <div style={{
+          display: "flex", gap: "0", marginBottom: "10px",
+          border: `1px solid ${MF.border}`, borderRadius: MF.radiusSm, overflow: "hidden",
+        }}>
+          {covered.length > 0 && (
+            <div style={{ flex: 1, padding: "8px 0", textAlign: "center", borderRight: `1px solid ${MF.border}` }}>
+              <div style={{ fontSize: "16px", fontWeight: 700, color: MF.green }}>{covered.length}</div>
+              <div style={{ fontSize: "9px", color: MF.textMuted, textTransform: "uppercase", letterSpacing: "0.05em" }}>covered</div>
+            </div>
+          )}
+          {mentionCount > 0 && (
+            <div style={{ flex: 1, padding: "8px 0", textAlign: "center", borderRight: setup?.immTarget > 0 ? `1px solid ${MF.border}` : "none" }}>
+              <div style={{ fontSize: "16px", fontWeight: 700, color: MF.amber }}>{mentionCount}</div>
+              <div style={{ fontSize: "9px", color: MF.textMuted, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                {scenario.isSolo || scenario.isCloser ? "to resolve" : "to mention"}
+              </div>
+            </div>
+          )}
+          {setup?.immTarget > 0 && vaccineCount !== undefined && (
+            <div style={{ flex: 1, padding: "8px 0", textAlign: "center" }}>
+              <div style={{ fontSize: "16px", fontWeight: 700, color: vaccineCount >= setup.immTarget ? MF.green : MF.accent }}>{vaccineCount}/{setup.immTarget}</div>
+              <div style={{ fontSize: "9px", color: MF.textMuted, textTransform: "uppercase", letterSpacing: "0.05em" }}>vaccines</div>
+            </div>
+          )}
+        </div>
+      )}
 
-      {/* Day notes — pass-along context */}
-      {setup?.dayNotes?.length > 0 && (
+      {/* Day notes — only show when handing off to someone */}
+      {!scenario.isSolo && setup?.dayNotes?.length > 0 && (
         <div style={{
           padding: "8px 12px", marginBottom: "8px",
           border: `1px solid ${MF.border}`, borderRadius: MF.radiusSm,
           fontSize: "12px", color: MF.textMuted, lineHeight: 1.4,
         }}>
-          <span style={{ fontWeight: 600, color: MF.secondary, fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Notes to pass along</span>
+          <span style={{ fontWeight: 600, color: MF.secondary, fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            {scenario.isCloser ? "Notes from today" : "Notes to pass along"}
+          </span>
           {setup.dayNotes.map((n, i) => (
             <div key={i} style={{ marginTop: "4px" }}>{n}</div>
           ))}
         </div>
       )}
 
-      {/* Unresolved items — compact expandable rows */}
+      {/* Unresolved items */}
       {unresolved.length > 0 && (
         <div style={{ display: "flex", flexDirection: "column", gap: "4px", marginBottom: "6px" }}>
           {unresolved.map((r) => {
@@ -2660,10 +2774,10 @@ function ExitScreen({ rules, itemStates, ctx, setup, onAction, vaccineCount }) {
                     </div>
                     <div style={{ display: "flex", gap: "6px" }}>
                       <button style={btn(MF.green, MF.greenDim)} onClick={() => { onAction(r.id, S.CONFIRMED); setExpandedItem(null); }}>
-                        Covered
+                        {scenario.isSolo || scenario.isCloser ? "Resolved" : "Covered"}
                       </button>
                       <button style={btn(MF.amber, MF.amberDim)} onClick={() => { onAction(r.id, S.NEEDS_ATTENTION); setExpandedItem(null); }}>
-                        Mention this
+                        {scenario.isSolo || scenario.isCloser ? "Needs follow-up" : "Mention this"}
                       </button>
                     </div>
                   </div>
@@ -2674,7 +2788,7 @@ function ExitScreen({ rules, itemStates, ctx, setup, onAction, vaccineCount }) {
         </div>
       )}
 
-      {/* Summary chips — passed windows + already covered */}
+      {/* Summary chips */}
       {(stillOpenExit.length > 0 || covered.length > 0) && (
         <div style={{ display: "flex", gap: "6px", marginTop: "8px", flexWrap: "wrap" }}>
           {stillOpenExit.length > 0 && (
@@ -2755,13 +2869,11 @@ function ExitScreen({ rules, itemStates, ctx, setup, onAction, vaccineCount }) {
         </div>
       )}
 
-      {/* Clean handoff message */}
+      {/* Clean exit message */}
       {unresolved.length === 0 && stillOpenExit.length === 0 && (
         <div style={{ textAlign: "center", padding: "12px 0", marginTop: "4px" }}>
           <div style={{ fontSize: "13px", color: MF.textMuted }}>
-            {covered.length > 0
-              ? `${covered.length} items covered. Thanks for a solid shift.`
-              : "All set. Thanks for keeping things steady."}
+            {scenario.exitClean(covered.length)}
           </div>
         </div>
       )}
@@ -3297,12 +3409,13 @@ export default function RxTempo() {
     exit: <ExitScreen rules={activeRules} itemStates={itemStates} ctx={ctx} setup={setup} onAction={handleActionAndReturn} vaccineCount={vaccineCount} />,
   };
 
+  const handoffScenario = getHandoffScenario(setup);
   const navItems = [
     { key: "home", label: "Home", icon: I.home },
-    { key: "arrival", label: "Arrival", icon: I.handoff, badge: arrivalBadge },
+    { key: "arrival", label: handoffScenario.isSolo ? "Start" : "Arrival", icon: I.handoff, badge: arrivalBadge },
     { key: "later", label: "Later", icon: I.clock },
     { key: "ahead", label: "Ahead", icon: I.ahead },
-    { key: "exit", label: "Exit", icon: I.exit, badge: exitBadge },
+    { key: "exit", label: handoffScenario.isSolo ? "Close" : "Exit", icon: I.exit, badge: exitBadge },
   ];
 
   return (
