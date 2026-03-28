@@ -511,10 +511,11 @@ function computeItemStates(rules, prevStates, setup, ctx) {
 }
 
 // ─── PACING LANGUAGE ───
-function getPacingLine(ctx, visibleCount, coverageMode, queueState) {
+function getPacingLine(ctx, visibleCount, coverageMode, queueState, coveredCount) {
   if (!ctx) return "";
   const mode = coverageMode || "solo";
   const q = queueState || "ontrack";
+  const c = coveredCount || 0;
 
   // High demand override — protective
   if (q === "highdemand") {
@@ -523,6 +524,9 @@ function getPacingLine(ctx, visibleCount, coverageMode, queueState) {
   }
 
   if (visibleCount === 0) {
+    if (c >= 10) return `Board clear — ${c} handled this shift.`;
+    if (c >= 5) return `${c} covered. Nothing left right now.`;
+    if (c > 0) return `${c} down. Clear board.`;
     if (ctx.timingPressure === "early") return "Settling in. Nothing pressing yet.";
     if (ctx.exitWindow) return "Almost done. Nothing left to surface.";
     if (ctx.timingPressure === "end-of-day") return "Wrapping up. Nothing left to surface.";
@@ -531,19 +535,24 @@ function getPacingLine(ctx, visibleCount, coverageMode, queueState) {
     return "Nothing pressing right now. Steady window.";
   }
   if (visibleCount === 1) {
+    if (c > 0) return `${c} covered. One more worth attention.`;
     if (ctx.exitWindow) return "One thing worth mentioning before you go.";
     if (mode === "overlap") return "One thing worth aligning on.";
     return "One thing worth attention right now.";
   }
   if (visibleCount <= 3) {
+    if (c >= 5) return `${c} down, ${visibleCount} to go.`;
+    if (c > 0) return `Rolling — ${visibleCount} left right now.`;
     if (ctx.exitWindow) return `${visibleCount} things to check before you go.`;
     if (q === "needsfocus") return `${visibleCount} items. Let's protect the rest of the day.`;
     return `${visibleCount} things worth attention right now.`;
   }
   if (visibleCount <= 5) {
+    if (c > 0) return `${c} covered, ${visibleCount} on the board.`;
     if (ctx.timingPressure === "tightening") return `${visibleCount} items — window is tightening.`;
     return `${visibleCount} items on the board.`;
   }
+  if (c > 0) return `${c} covered. Busy board — showing what matters most.`;
   return "Busy board. Showing what matters most.";
 }
 
@@ -1682,6 +1691,7 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
   const [showStillOpen, setShowStillOpen] = useState(false);
   const [showCovered, setShowCovered] = useState(false);
   const [showAllVisible, setShowAllVisible] = useState(false);
+  const [justConfirmed, setJustConfirmed] = useState(null);
 
   const WEIGHT_RANK = { high: 0, medium: 1, low: 2 };
   const MAX_SHOWN = 4;
@@ -1699,6 +1709,20 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
     [S.CONFIRMED, S.HANDLED_EARLY].includes(itemStates[r.id])
   );
 
+  // Total actionable items (not get-ahead, not N/A)
+  const totalActionable = rules.filter((r) => r.category !== "getahead").length;
+  const coveredCount = confirmed.length;
+  const completionPct = totalActionable > 0 ? (coveredCount / totalActionable) * 100 : 0;
+
+  const handleConfirm = (ruleId) => {
+    setJustConfirmed(ruleId);
+    setTimeout(() => {
+      onAction(ruleId, S.CONFIRMED);
+      setExpandedItem(null);
+      setJustConfirmed(null);
+    }, 400);
+  };
+
   // Items whose window has passed without being actioned
   const stillOpen = rules.filter((r) => {
     if (r.category === "getahead") return false;
@@ -1710,7 +1734,7 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
     return win.end < ctx.currentMin && win.end > 0;
   });
 
-  const pacingLine = getPacingLine(ctx, visible.length, ctx.coverageMode, queueState);
+  const pacingLine = getPacingLine(ctx, visible.length, ctx.coverageMode, queueState, coveredCount);
   const phaseLabel = getPhaseLabel(ctx);
   const highPressure = visible.length > 5 || queueState === "highdemand";
 
@@ -1725,12 +1749,23 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
           <span style={{ opacity: 0.4 }}>·</span>
           <span>{fmtTime12(ctx.currentMin)}</span>
         </div>
-        <div style={{ width: "100%", height: "3px", background: MF.border, borderRadius: "2px", overflow: "hidden" }}>
-          <div style={{
-            width: `${ctx.shiftProgress * 100}%`, height: "100%",
-            background: highPressure ? MF.amber : MF.gradient,
-            borderRadius: "2px", transition: "width 1s ease",
-          }} />
+        <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
+          <div style={{ flex: 1, height: "3px", background: MF.border, borderRadius: "2px", overflow: "hidden" }}>
+            <div style={{
+              width: `${ctx.shiftProgress * 100}%`, height: "100%",
+              background: highPressure ? MF.amber : MF.gradient,
+              borderRadius: "2px", transition: "width 1s ease",
+            }} />
+          </div>
+          {coveredCount > 0 && (
+            <div style={{ flex: 1, height: "3px", background: MF.border, borderRadius: "2px", overflow: "hidden" }}>
+              <div style={{
+                width: `${completionPct}%`, height: "100%",
+                background: MF.green,
+                borderRadius: "2px", transition: "width 0.6s ease",
+              }} />
+            </div>
+          )}
         </div>
       </div>
 
@@ -1842,11 +1877,14 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
             if (isEscalated || isAttention) leftBorder = MF.amber;
             else if (isHandoff) leftBorder = MF.accentMid;
 
+            const isConfirming = justConfirmed === r.id;
+
             return (
               <div key={r.id} style={{
-                background: isEscalated ? MF.amberDim : MF.card,
-                border: `1px solid ${isEscalated ? MF.amber + "4D" : MF.border}`,
-                borderLeft: `3px solid ${leftBorder}`,
+                background: isConfirming ? MF.greenDim : isEscalated ? MF.amberDim : MF.card,
+                border: `1px solid ${isConfirming ? MF.green + "60" : isEscalated ? MF.amber + "4D" : MF.border}`,
+                borderLeft: `3px solid ${isConfirming ? MF.green : leftBorder}`,
+                transition: "all 0.3s ease",
                 borderRadius: MF.radius,
                 overflow: "hidden",
                 animation: "slideUp 0.25s ease both",
@@ -1862,15 +1900,22 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
                 >
                   <div style={{
                     width: "8px", height: "8px", borderRadius: "50%", flexShrink: 0,
-                    background: dotColor,
+                    background: isConfirming ? MF.green : dotColor,
+                    transition: "background 0.2s ease",
                   }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: "14px", fontWeight: 600, color: MF.text, letterSpacing: "-0.01em" }}>
-                      {r.label}
+                    <div style={{
+                      fontSize: "14px", fontWeight: 600, letterSpacing: "-0.01em",
+                      color: isConfirming ? MF.green : MF.text,
+                      transition: "color 0.2s ease",
+                    }}>
+                      {isConfirming ? "Done" : r.label}
                     </div>
+                    {!isConfirming && (
                     <div style={{ fontSize: "11px", color: MF.textMuted, marginTop: "1px", lineHeight: 1.3 }}>
                       {r.roleContext}
                     </div>
+                    )}
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
                     {isHandoff && <span style={badge(MF.accent, MF.accentDim)}>Handoff</span>}
@@ -1894,7 +1939,7 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
                       </span>
                     )}
                     <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-                      <button style={btn(MF.green, MF.greenDim)} onClick={() => { onAction(r.id, S.CONFIRMED); setExpandedItem(null); }}>
+                      <button style={btn(MF.green, MF.greenDim)} onClick={() => handleConfirm(r.id)}>
                         Looks done
                       </button>
                       <button style={btn(MF.amber, MF.amberDim)} onClick={() => { onAction(r.id, S.NEEDS_ATTENTION); setExpandedItem(null); }}>
