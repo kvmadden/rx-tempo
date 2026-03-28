@@ -6,10 +6,10 @@ const RULES = [
   {
     id: "open-orientation",
     label: "Opening orientation",
-    description: "Quick scan of what the day looks like — queue depth, will call volume, any carryover.",
+    description: "Knowing what carried over and what's ahead means fewer surprises once patients start arriving. A two-minute scan now sets the rhythm for the whole shift.",
     category: "opening",
     usualWindow: { startOffset: 0, endOffset: 30 },
-    roleContext: "Usually the opener or first pharmacist in.",
+    roleContext: "Set the pace before the first patient walks in.",
     carryLogic: "suppress",
     handoffEligibility: "arrival",
     getAheadEligible: false,
@@ -18,10 +18,10 @@ const RULES = [
   {
     id: "open-register",
     label: "Registers and systems ready",
-    description: "POS up, pharmacy system logged in, queues visible.",
+    description: "A patient shouldn't have to wait because a register isn't logged in. Getting systems live before the doors open keeps the first interaction smooth.",
     category: "opening",
     usualWindow: { startOffset: 0, endOffset: 20 },
-    roleContext: "Often handled before the first customer.",
+    roleContext: "Smooth first impression for the day.",
     carryLogic: "suppress",
     handoffEligibility: null,
     getAheadEligible: false,
@@ -30,10 +30,10 @@ const RULES = [
   {
     id: "open-willcall",
     label: "Will call check",
-    description: "Scan will call bins for returns to stock, misfiled bags, or anything expiring today.",
+    description: "Patients get frustrated when their script isn't where it should be. A quick scan now catches misfiled bags and expiring holds before they become pickup problems.",
     category: "opening",
     usualWindow: { startOffset: 5, endOffset: 60 },
-    roleContext: "Worth checking early to avoid surprises later.",
+    roleContext: "Prevents surprises at the pickup window.",
     carryLogic: "carry",
     handoffEligibility: "arrival",
     getAheadEligible: false,
@@ -42,10 +42,10 @@ const RULES = [
   {
     id: "open-delivery",
     label: "Delivery scan",
-    description: "Check for incoming orders and wholesaler delivery. Note anything missing or short-shipped.",
+    description: "Catching a short-ship early means you can reorder before it affects a patient. Waiting until someone needs the med makes it urgent instead of routine.",
     category: "opening",
     usualWindow: { startOffset: 0, endOffset: 90 },
-    roleContext: "Often handled by whoever is at the bench first.",
+    roleContext: "Keeps inventory gaps from reaching patients.",
     carryLogic: "carry",
     handoffEligibility: null,
     getAheadEligible: false,
@@ -54,10 +54,10 @@ const RULES = [
   {
     id: "open-fridge",
     label: "Refrigerator temperature log",
-    description: "Check and document fridge temps. Flag anything out of range early.",
+    description: "An out-of-range fridge can mean thousands in lost vaccine and insulin inventory. A 30-second check protects product and keeps you compliant.",
     category: "opening",
     usualWindow: { startOffset: 0, endOffset: 45 },
-    roleContext: "Usually done at open — quick and routine.",
+    roleContext: "Protects high-value inventory.",
     carryLogic: "carry",
     handoffEligibility: null,
     getAheadEligible: false,
@@ -67,10 +67,10 @@ const RULES = [
   {
     id: "mid-queue",
     label: "Queue and production check",
-    description: "How does the queue look? Any stuck scripts, missing parts, or insurance rejects piling up?",
+    description: "A stuck claim or missing part can snowball into a long wait at pickup. Catching it now keeps the line moving and patients happy.",
     category: "midday",
     usualWindow: { startOffset: 120, endOffset: 240 },
-    roleContext: "Worth a quick scan by whoever has a moment.",
+    roleContext: "Keeps small problems from becoming big waits.",
     carryLogic: "carry",
     handoffEligibility: "exit",
     getAheadEligible: false,
@@ -79,10 +79,10 @@ const RULES = [
   {
     id: "mid-immunizations",
     label: "Immunization appointments",
-    description: "Any scheduled immunizations coming up this afternoon? Supplies ready?",
+    description: "A patient who booked an appointment chose your pharmacy on purpose. Having supplies ready and the schedule in mind honors that trust.",
     category: "midday",
     usualWindow: { startOffset: 120, endOffset: 300 },
-    roleContext: "Usually the pharmacist who will be at the window.",
+    roleContext: "Patients planned around this — be ready.",
     carryLogic: "carry",
     handoffEligibility: "arrival",
     getAheadEligible: true,
@@ -91,10 +91,10 @@ const RULES = [
   {
     id: "mid-cycle-count",
     label: "Cycle count window",
-    description: "If cycle counts are due today, mid-shift is usually the calmest time to get through them.",
+    description: "Accurate counts prevent phantom stock situations — where the system says you have it but the shelf is empty. Mid-shift is usually the calmest window.",
     category: "midday",
     usualWindow: { startOffset: 150, endOffset: 330 },
-    roleContext: "Often easier with two people if overlap allows.",
+    roleContext: "Best done during a calm stretch.",
     carryLogic: "carry",
     handoffEligibility: null,
     getAheadEligible: true,
@@ -103,10 +103,10 @@ const RULES = [
   {
     id: "mid-dur",
     label: "DUR follow-ups",
-    description: "Any drug utilization reviews flagged that need pharmacist resolution before fill.",
+    description: "These flags exist because something in the patient's profile needs a pharmacist's eye. Resolving them now means scripts move forward instead of sitting in limbo.",
     category: "midday",
     usualWindow: { startOffset: 90, endOffset: 300 },
-    roleContext: "Usually the verifying pharmacist.",
+    roleContext: "Clears the path for scripts to fill.",
     carryLogic: "carry",
     handoffEligibility: "exit",
     getAheadEligible: false,
@@ -115,10 +115,10 @@ const RULES = [
   {
     id: "mid-mtm",
     label: "MTM alerts",
-    description: "Medication therapy management cases due today — review and document if time allows.",
+    description: "These are patients where a quick conversation can genuinely improve outcomes. Documenting it also keeps the store's clinical metrics healthy.",
     category: "midday",
     usualWindow: { startOffset: 120, endOffset: 360 },
-    roleContext: "Worth fitting in during a calmer stretch.",
+    roleContext: "Real impact on patient outcomes.",
     carryLogic: "carry",
     handoffEligibility: "exit",
     getAheadEligible: true,
@@ -128,10 +128,10 @@ const RULES = [
   {
     id: "deadline-rts",
     label: "Return to stock cutoff",
-    description: "Prescriptions past their hold window — return to stock before end of day.",
+    description: "Scripts sitting past their hold window tie up inventory other patients might need. Returning them frees up stock and keeps the shelves accurate.",
     category: "deadline",
     usualWindow: { startOffset: 300, endOffset: 480 },
-    roleContext: "Usually handled in a calmer window before close.",
+    roleContext: "Frees up inventory for patients who need it.",
     carryLogic: "carry",
     handoffEligibility: "exit",
     getAheadEligible: true,
@@ -140,10 +140,10 @@ const RULES = [
   {
     id: "deadline-controls",
     label: "Controlled substance reconciliation",
-    description: "Daily CII count or reconciliation if your store requires it.",
+    description: "This is a compliance requirement, but it also protects you and your team. A clean count today means no surprises at audit time.",
     category: "deadline",
     usualWindow: { startOffset: -90, endOffset: -15 },
-    roleContext: "Usually the closing pharmacist.",
+    roleContext: "Protects the team at audit time.",
     carryLogic: "carry",
     handoffEligibility: "exit",
     getAheadEligible: false,
@@ -152,10 +152,10 @@ const RULES = [
   {
     id: "deadline-report",
     label: "End-of-day reports",
-    description: "Print or review daily fill count, exception reports, or anything your store runs at close.",
+    description: "These reports catch exceptions before they carry over. Reviewing now means tomorrow's opener doesn't inherit problems you could have flagged today.",
     category: "deadline",
     usualWindow: { startOffset: -60, endOffset: -10 },
-    roleContext: "Usually the closing pharmacist.",
+    roleContext: "Sets up tomorrow's team for success.",
     carryLogic: "carry",
     handoffEligibility: "exit",
     getAheadEligible: false,
@@ -165,10 +165,10 @@ const RULES = [
   {
     id: "exit-queue-state",
     label: "Queue state at handoff",
-    description: "What does the queue look like for whoever is staying or coming next?",
+    description: "The person coming in next can't see what you saw today. A quick heads-up on queue depth saves them from walking in blind.",
     category: "exit",
     usualWindow: { startOffset: -30, endOffset: 0 },
-    roleContext: "Worth mentioning to the next pharmacist.",
+    roleContext: "Nobody likes walking in blind.",
     carryLogic: "carry",
     handoffEligibility: "exit",
     getAheadEligible: false,
@@ -177,10 +177,10 @@ const RULES = [
   {
     id: "exit-open-issues",
     label: "Unresolved issues to mention",
-    description: "Anything that came up today that the next person should know about — insurance problems, patient callbacks, doctor follow-ups.",
+    description: "An unmentioned callback or pending prior auth can leave a patient hanging. A 60-second verbal handoff closes the loop and builds team trust.",
     category: "exit",
     usualWindow: { startOffset: -30, endOffset: 0 },
-    roleContext: "Verbal handoff material.",
+    roleContext: "Keeps patients from falling through the cracks.",
     carryLogic: "carry",
     handoffEligibility: "exit",
     getAheadEligible: false,
@@ -190,10 +190,10 @@ const RULES = [
   {
     id: "ahead-outdates",
     label: "Outdate pull",
-    description: "Pull and quarantine anything expiring within the check window.",
+    description: "Expired product on the shelf is a dispensing risk and a compliance issue. Pulling it now means one less thing to worry about later.",
     category: "getahead",
     usualWindow: { startOffset: 60, endOffset: -60 },
-    roleContext: "Can be started whenever there is a calm window.",
+    roleContext: "Calm moment? Protect the shelves.",
     carryLogic: "suppress",
     handoffEligibility: null,
     getAheadEligible: true,
@@ -202,10 +202,10 @@ const RULES = [
   {
     id: "ahead-facing",
     label: "Shelf facing and organization",
-    description: "Quick tidy of fast-mover shelves and high-traffic bins.",
+    description: "A tidy shelf means faster pulls and fewer pick errors. It's a small investment that speeds up everyone's workflow for the rest of the day.",
     category: "getahead",
     usualWindow: { startOffset: 60, endOffset: -60 },
-    roleContext: "Nice to do when the queue is light.",
+    roleContext: "Faster pulls, fewer errors.",
     carryLogic: "suppress",
     handoffEligibility: null,
     getAheadEligible: true,
@@ -214,10 +214,10 @@ const RULES = [
   {
     id: "ahead-smartcount",
     label: "Smart count prep",
-    description: "Get ahead on smart count pulls for tomorrow if today allows it.",
+    description: "Getting ahead on tomorrow's counts means tomorrow's team starts with a cleaner board. Good days are built the shift before.",
     category: "getahead",
     usualWindow: { startOffset: 120, endOffset: -60 },
-    roleContext: "Only if the day is calm enough to justify it.",
+    roleContext: "Tomorrow's team will thank you.",
     carryLogic: "suppress",
     handoffEligibility: null,
     getAheadEligible: true,
@@ -227,10 +227,10 @@ const RULES = [
   {
     id: "mid-waiters",
     label: "Waiters check",
-    description: "Anyone waiting longer than expected? Quick scan of the waiter bench.",
+    description: "Someone sitting in the waiting area is watching the clock. A quick scan catches anyone who's been waiting longer than they should.",
     category: "midday",
     usualWindow: { startOffset: 60, endOffset: 360 },
-    roleContext: "Whoever is near the pickup window.",
+    roleContext: "Someone might be watching the clock.",
     carryLogic: "carry",
     handoffEligibility: null,
     getAheadEligible: false,
@@ -239,10 +239,10 @@ const RULES = [
   {
     id: "mid-voicemail",
     label: "Pharmacy voicemail",
-    description: "Check the voicemail queue — prescriber callbacks, patient questions, refill requests.",
+    description: "A prescriber callback sitting in voicemail can delay a patient's fill for hours. Clearing the queue keeps things moving for everyone.",
     category: "midday",
     usualWindow: { startOffset: 90, endOffset: 240 },
-    roleContext: "Usually checked mid-morning and mid-afternoon.",
+    roleContext: "Unanswered calls delay patient care.",
     carryLogic: "carry",
     handoffEligibility: "exit",
     getAheadEligible: false,
@@ -251,10 +251,10 @@ const RULES = [
   {
     id: "mid-callbacks",
     label: "Patient callbacks",
-    description: "Any patients expecting a call back today? Insurance issues, special orders, prior auth updates.",
+    description: "These patients are waiting to hear from you — about insurance, a special order, or a prior auth. Following up builds the kind of trust that keeps them coming back.",
     category: "midday",
     usualWindow: { startOffset: 120, endOffset: 360 },
-    roleContext: "Usually the pharmacist who took the original call.",
+    roleContext: "Someone is waiting to hear from you.",
     carryLogic: "carry",
     handoffEligibility: "exit",
     getAheadEligible: false,
@@ -263,10 +263,10 @@ const RULES = [
   {
     id: "mid-readyfill",
     label: "ReadyFill review",
-    description: "Review auto-fill queue for anything that needs pharmacist intervention before it drops.",
+    description: "Auto-fills that need intervention will just sit there until someone looks. Catching them now prevents a patient from showing up to nothing ready.",
     category: "midday",
     usualWindow: { startOffset: 150, endOffset: 300 },
-    roleContext: "Usually the verifying pharmacist.",
+    roleContext: "Prevents empty-handed pickups.",
     carryLogic: "carry",
     handoffEligibility: null,
     getAheadEligible: true,
@@ -1679,6 +1679,9 @@ function StartDayScreen({ onComplete }) {
 function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArrivals, onEventArrival, queueState, onQueueState, vaccineCount, onVaccine, dayNoteStates, onDayNoteState, dayNoteConfirm, onDayNoteConfirm }) {
   const [queueExpanded, setQueueExpanded] = useState(false);
   const [immExpanded, setImmExpanded] = useState(false);
+  const [expandedItem, setExpandedItem] = useState(null);
+  const [showStillOpen, setShowStillOpen] = useState(false);
+  const [showCovered, setShowCovered] = useState(false);
 
   const visible = rules.filter((r) =>
     [S.VISIBLE, S.NEEDS_ATTENTION, S.VISIBLE_HANDOFF].includes(itemStates[r.id])
@@ -1911,7 +1914,7 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
         {pacingLine}
       </h2>
 
-      {/* Visible items */}
+      {/* Visible items — compact rows with expand */}
       {visible.length === 0 ? (
         <QuietState
           message={queueState === "highdemand" ? "Focus on the patient in front of you." : "Nothing pressing right now."}
@@ -1922,55 +1925,151 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
                "You're in a steady window."}
         />
       ) : (
-        visible.map((r) => (
-          <ItemCard key={r.id} rule={r} state={itemStates[r.id]} onAction={onAction} timingPressure={ctx.timingPressure} />
-        ))
+        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+          {visible.map((r) => {
+            const isOpen = expandedItem === r.id;
+            const st = itemStates[r.id];
+            const isAttention = st === S.NEEDS_ATTENTION;
+            const isHandoff = st === S.VISIBLE_HANDOFF;
+            const isEscalated = isAttention && r.riskWeight === "high" &&
+              (ctx.timingPressure === "tightening" || ctx.timingPressure === "end-of-day");
+            const dotColor = r.riskWeight === "high" ? MF.amber : r.riskWeight === "medium" ? MF.secondary : MF.border;
+            let leftBorder = MF.border;
+            if (isEscalated || isAttention) leftBorder = MF.amber;
+            else if (isHandoff) leftBorder = MF.accentMid;
+
+            return (
+              <div key={r.id} style={{
+                background: isEscalated ? MF.amberDim : MF.card,
+                border: `1px solid ${isEscalated ? MF.amber + "4D" : MF.border}`,
+                borderLeft: `3px solid ${leftBorder}`,
+                borderRadius: MF.radius,
+                overflow: "hidden",
+                animation: "slideUp 0.25s ease both",
+              }}>
+                {/* Compact row — always visible */}
+                <button
+                  onClick={() => setExpandedItem(isOpen ? null : r.id)}
+                  style={{
+                    width: "100%", display: "flex", alignItems: "center", gap: "10px",
+                    padding: "14px 16px", background: "none", border: "none",
+                    cursor: "pointer", fontFamily: MF.font, textAlign: "left",
+                  }}
+                >
+                  <div style={{
+                    width: "8px", height: "8px", borderRadius: "50%", flexShrink: 0,
+                    background: dotColor,
+                  }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: "15px", fontWeight: 600, color: MF.text, letterSpacing: "-0.01em" }}>
+                      {r.label}
+                    </div>
+                    <div style={{ fontSize: "12px", color: MF.textMuted, marginTop: "2px", lineHeight: 1.3 }}>
+                      {r.roleContext}
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
+                    {isHandoff && <span style={badge(MF.accent, MF.accentDim)}>Handoff</span>}
+                    {isAttention && !isEscalated && <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: MF.amber }} />}
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={MF.textMuted} strokeWidth="2" strokeLinecap="round" style={{
+                      transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
+                      transition: "transform 0.2s ease", opacity: 0.4,
+                    }}><polyline points="6 9 12 15 18 9"/></svg>
+                  </div>
+                </button>
+
+                {/* Expanded detail */}
+                {isOpen && (
+                  <div style={{ padding: "0 16px 14px", animation: "fadeIn 0.15s ease" }}>
+                    <div style={{ fontSize: "13px", color: MF.textMuted, lineHeight: 1.6, marginBottom: "12px" }}>
+                      {r.description}
+                    </div>
+                    {isEscalated && (
+                      <span style={{ ...badge(MF.amber, MF.amberDim), display: "inline-block", marginBottom: "10px" }}>
+                        Entering a tighter window
+                      </span>
+                    )}
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                      <button style={btn(MF.green, MF.greenDim)} onClick={() => { onAction(r.id, S.CONFIRMED); setExpandedItem(null); }}>
+                        Looks done
+                      </button>
+                      <button style={btn(MF.amber, MF.amberDim)} onClick={() => { onAction(r.id, S.NEEDS_ATTENTION); setExpandedItem(null); }}>
+                        Still needs attention
+                      </button>
+                      <button style={btn(MF.textMuted, "rgba(139,148,158,0.08)")} onClick={() => { onAction(r.id, S.NOT_APPLICABLE); setExpandedItem(null); }}>
+                        Not needed today
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       )}
 
-      {/* Later today link */}
-      {onNav && (() => {
-        const laterCount = rules.filter((r) => {
+      {/* Summary chips */}
+      {(() => {
+        const laterCount = onNav ? rules.filter((r) => {
           if ([S.CONFIRMED, S.HANDLED_EARLY, S.NOT_APPLICABLE].includes(itemStates[r.id])) return false;
           if (r.category === "getahead") return false;
           if ([S.VISIBLE, S.VISIBLE_HANDOFF, S.NEEDS_ATTENTION].includes(itemStates[r.id])) return false;
           if (itemStates[r.id] !== S.HIDDEN) return false;
           const win = resolveWindow(r, setup);
           return win.start > ctx.currentMin;
-        }).length;
-        if (laterCount === 0) return null;
+        }).length : 0;
+        const skipped = rules.filter((r) => itemStates[r.id] === S.NOT_APPLICABLE).length;
+        const hasChips = laterCount > 0 || stillOpen.length > 0 || confirmed.length > 0;
+        if (!hasChips) return null;
+
         return (
-          <button
-            onClick={() => onNav("later")}
-            style={{
-              background: "none", border: "none", color: MF.textMuted,
-              fontSize: "13px", fontFamily: MF.font, cursor: "pointer",
-              padding: "12px 0", width: "100%", textAlign: "center",
-              opacity: 0.7, transition: "opacity 0.15s",
-            }}
-          >
-            {"View later today (" + laterCount + " upcoming) →"}
-          </button>
+          <div style={{
+            display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "16px",
+            justifyContent: "center",
+          }}>
+            {laterCount > 0 && (
+              <button onClick={() => onNav("later")} style={{
+                padding: "7px 14px", borderRadius: "20px", fontSize: "12px", fontWeight: 600,
+                fontFamily: MF.font, cursor: "pointer", transition: "all 0.15s ease",
+                border: `1px solid ${MF.border}`, background: "transparent", color: MF.textMuted,
+              }}>
+                {laterCount} later
+              </button>
+            )}
+            {stillOpen.length > 0 && (
+              <button onClick={() => setShowStillOpen(!showStillOpen)} style={{
+                padding: "7px 14px", borderRadius: "20px", fontSize: "12px", fontWeight: 600,
+                fontFamily: MF.font, cursor: "pointer", transition: "all 0.15s ease",
+                border: `1px solid ${showStillOpen ? MF.amber + "60" : MF.amber + "40"}`,
+                background: showStillOpen ? MF.amberDim : "transparent",
+                color: MF.amber,
+              }}>
+                {stillOpen.length} still open
+              </button>
+            )}
+            {confirmed.length > 0 && (
+              <button onClick={() => setShowCovered(!showCovered)} style={{
+                padding: "7px 14px", borderRadius: "20px", fontSize: "12px", fontWeight: 600,
+                fontFamily: MF.font, cursor: "pointer", transition: "all 0.15s ease",
+                border: `1px solid ${showCovered ? MF.green + "60" : MF.border}`,
+                background: showCovered ? MF.greenDim : "transparent",
+                color: showCovered ? MF.green : MF.textMuted,
+              }}>
+                {confirmed.length} covered
+              </button>
+            )}
+          </div>
         );
       })()}
 
-      {/* Still open — window passed, never actioned */}
-      {stillOpen.length > 0 && (
-        <div style={{ marginTop: "8px" }}>
-          <SectionLabel>Still open</SectionLabel>
-          <div style={{
-            background: MF.amberDim, borderRadius: MF.radiusSm,
-            padding: "10px 14px", marginBottom: "12px",
-            fontSize: "13px", color: MF.amber, fontWeight: 500, lineHeight: 1.5,
-          }}>
-            {stillOpen.length === 1
-              ? "One item's usual window has passed. Worth a quick check."
-              : `${stillOpen.length} items' usual windows have passed. Worth a quick check.`}
-          </div>
+      {/* Still open — expanded from chip */}
+      {showStillOpen && stillOpen.length > 0 && (
+        <div style={{ marginTop: "12px", animation: "fadeIn 0.15s ease" }}>
           {stillOpen.map((r) => (
             <div key={r.id} style={{
               background: MF.card, border: `1px solid ${MF.border}`,
               borderLeft: `3px solid ${MF.amber}`,
-              borderRadius: MF.radius, padding: "14px 16px", marginBottom: "8px",
+              borderRadius: MF.radius, padding: "14px 16px", marginBottom: "6px",
             }}>
               <div style={{ display: "flex", gap: "10px" }}>
                 <div style={{
@@ -1998,23 +2097,12 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
         </div>
       )}
 
-      {/* Confirmed */}
-      {confirmed.length > 0 && (
-        <>
-          <SectionLabel>Already covered today</SectionLabel>
+      {/* Confirmed — expanded from chip */}
+      {showCovered && confirmed.length > 0 && (
+        <div style={{ marginTop: "12px", animation: "fadeIn 0.15s ease" }}>
           {confirmed.map((r) => (
             <ConfirmedCard key={r.id} rule={r} state={itemStates[r.id]} />
           ))}
-        </>
-      )}
-
-      {/* Day summary */}
-      {(confirmed.length > 0 || visible.length > 0) && (
-        <div style={{
-          textAlign: "center", padding: "16px 0 4px",
-          fontSize: "12px", color: MF.textMuted, opacity: 0.5,
-        }}>
-          {confirmed.length} covered · {visible.length} active{stillOpen.length > 0 ? ` · ${stillOpen.length} still open` : ""} · {rules.filter((r) => itemStates[r.id] === S.NOT_APPLICABLE).length} skipped
         </div>
       )}
 
