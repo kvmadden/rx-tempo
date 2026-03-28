@@ -804,6 +804,11 @@ const badge = (color, bg) => ({
 const isComplianceItem = (r) => (r.itemType || "task") === "compliance";
 const isCheckItem = (r) => (r.itemType || "task") === "check";
 const getDotColor = (r, isComp) => isComp ? MF.compliance : r.riskWeight === "high" ? MF.amber : r.riskWeight === "medium" ? MF.secondary : MF.border;
+const confirmTransition = (isConfirming) => ({
+  transition: "background 0.3s ease, border-color 0.3s ease, transform 0.3s ease, opacity 0.3s ease",
+  transform: isConfirming ? "scale(0.98)" : "scale(1)",
+  opacity: isConfirming ? 0.85 : 1,
+});
 
 const ExpandChevron = ({ isOpen }) => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={MF.textMuted} strokeWidth="2" strokeLinecap="round" style={{
@@ -2101,9 +2106,7 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
                 <div key={r.id} style={{
                   background: isConfirming ? MF.greenDim : MF.card,
                   border: `1px solid ${isConfirming ? MF.green + "60" : MF.border}`,
-                  transition: "background 0.3s ease, border-color 0.3s ease, transform 0.3s ease, opacity 0.3s ease",
-                  transform: isConfirming ? "scale(0.98)" : "scale(1)",
-                  opacity: isConfirming ? 0.85 : 1,
+                  ...confirmTransition(isConfirming),
                   borderRadius: MF.radiusSm,
                   animation: "slideUp 0.25s ease both",
                   display: "flex", alignItems: "center", gap: "8px",
@@ -2155,9 +2158,7 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
                   background: isConfirming ? MF.greenDim : MF.card,
                   border: `1px solid ${isConfirming ? MF.green + "60" : MF.compliance + "40"}`,
                   borderLeft: `3px solid ${isConfirming ? MF.green : MF.compliance}`,
-                  transition: "background 0.3s ease, border-color 0.3s ease, transform 0.3s ease, opacity 0.3s ease",
-                  transform: isConfirming ? "scale(0.98)" : "scale(1)",
-                  opacity: isConfirming ? 0.85 : 1,
+                  ...confirmTransition(isConfirming),
                   borderRadius: MF.radius,
                   overflow: "hidden",
                   animation: "slideUp 0.25s ease both",
@@ -2252,9 +2253,7 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
                 background: isConfirming ? MF.greenDim : isEscalated ? MF.amberDim : MF.card,
                 border: `1px solid ${isConfirming ? MF.green + "60" : isEscalated ? MF.amber + "4D" : MF.border}`,
                 borderLeft: `3px solid ${isConfirming ? MF.green : leftBorder}`,
-                transition: "background 0.3s ease, border-color 0.3s ease, transform 0.3s ease, opacity 0.3s ease",
-                transform: isConfirming ? "scale(0.98)" : "scale(1)",
-                opacity: isConfirming ? 0.85 : 1,
+                ...confirmTransition(isConfirming),
                 borderRadius: MF.radius,
                 overflow: "hidden",
                 animation: "slideUp 0.25s ease both",
@@ -2740,8 +2739,8 @@ function getHandoffScenario(setup) {
   };
 }
 
-// ARRIVAL HANDSHAKE — adaptive based on shift scenario
-function ArrivalScreen({ rules, itemStates, ctx, onAction, setup }) {
+// Shared hook for item expand/confirm state used by all secondary screens
+function useItemConfirmState(onAction) {
   const [expandedItem, setExpandedItem] = useState(null);
   const [justConfirmed, setJustConfirmed] = useState(null);
   const timerRef = useRef(null);
@@ -2752,6 +2751,12 @@ function ArrivalScreen({ rules, itemStates, ctx, onAction, setup }) {
     setJustConfirmed(ruleId);
     timerRef.current = setTimeout(() => { onAction(ruleId, state); setExpandedItem(null); setJustConfirmed(null); timerRef.current = null; }, CONFIRM_FLASH_MS);
   };
+  return { expandedItem, setExpandedItem, justConfirmed, handleConfirm };
+}
+
+// ARRIVAL HANDSHAKE — adaptive based on shift scenario
+function ArrivalScreen({ rules, itemStates, ctx, onAction, setup }) {
+  const { expandedItem, setExpandedItem, justConfirmed, handleConfirm } = useItemConfirmState(onAction);
   const scenario = getHandoffScenario(setup);
   const { items, handled } = useMemo(() => ({
     items: rules.filter((r) =>
@@ -2844,9 +2849,7 @@ function ArrivalScreen({ rules, itemStates, ctx, onAction, setup }) {
                 border: `1px solid ${isConfirming ? MF.green + "60" : isAttention ? MF.amber + "4D" : isComp ? MF.compliance + "40" : MF.border}`,
                 borderLeft: `3px solid ${isConfirming ? MF.green : isAttention ? MF.amber : isComp ? MF.compliance : MF.accentMid}`,
                 borderRadius: MF.radius, overflow: "hidden",
-                transition: "background 0.3s ease, border-color 0.3s ease, transform 0.3s ease, opacity 0.3s ease",
-                transform: isConfirming ? "scale(0.98)" : "scale(1)",
-                opacity: isConfirming ? 0.85 : 1,
+                ...confirmTransition(isConfirming),
               }}>
                 <button
                   aria-expanded={isOpen}
@@ -2905,17 +2908,8 @@ function ArrivalScreen({ rules, itemStates, ctx, onAction, setup }) {
 
 // LATER TODAY
 function LaterTodayScreen({ rules, itemStates, setup, ctx, onAction }) {
-  const [expandedItem, setExpandedItem] = useState(null);
+  const { expandedItem, setExpandedItem, justConfirmed, handleConfirm } = useItemConfirmState(onAction);
   const [showAll, setShowAll] = useState(false);
-  const [justConfirmed, setJustConfirmed] = useState(null);
-  const timerRef = useRef(null);
-  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
-  const handleConfirm = (ruleId, state) => {
-    if (timerRef.current) clearTimeout(timerRef.current);
-    haptic();
-    setJustConfirmed(ruleId);
-    timerRef.current = setTimeout(() => { onAction(ruleId, state); setExpandedItem(null); setJustConfirmed(null); timerRef.current = null; }, CONFIRM_FLASH_MS);
-  };
   const MAX_SHOWN = 5;
 
   const laterItems = useMemo(() => rules.filter((r) => {
@@ -2958,9 +2952,7 @@ function LaterTodayScreen({ rules, itemStates, setup, ctx, onAction }) {
                 borderLeft: isComp ? `3px solid ${isConfirming ? MF.green : MF.compliance}` : undefined,
                 borderRadius: MF.radius, overflow: "hidden",
                 animation: "slideUp 0.25s ease both",
-                transition: "background 0.3s ease, border-color 0.3s ease, transform 0.3s ease, opacity 0.3s ease",
-                transform: isConfirming ? "scale(0.98)" : "scale(1)",
-                opacity: isConfirming ? 0.85 : 1,
+                ...confirmTransition(isConfirming),
               }}>
                 {/* Compact row */}
                 <button
@@ -3043,16 +3035,7 @@ function LaterTodayScreen({ rules, itemStates, setup, ctx, onAction }) {
 
 // GET AHEAD
 function GetAheadScreen({ rules, itemStates, ctx, onAction, queueState }) {
-  const [expandedItem, setExpandedItem] = useState(null);
-  const [justConfirmed, setJustConfirmed] = useState(null);
-  const timerRef = useRef(null);
-  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
-  const handleConfirm = (ruleId, state) => {
-    if (timerRef.current) clearTimeout(timerRef.current);
-    haptic();
-    setJustConfirmed(ruleId);
-    timerRef.current = setTimeout(() => { onAction(ruleId, state); setExpandedItem(null); setJustConfirmed(null); timerRef.current = null; }, CONFIRM_FLASH_MS);
-  };
+  const { expandedItem, setExpandedItem, justConfirmed, handleConfirm } = useItemConfirmState(onAction);
 
   const { eligible, activeCount } = useMemo(() => ({
     eligible: rules.filter((r) =>
@@ -3093,9 +3076,7 @@ function GetAheadScreen({ rules, itemStates, ctx, onAction, queueState }) {
                 border: `1px solid ${isConfirming ? MF.green + "60" : MF.border}`,
                 borderRadius: MF.radius, overflow: "hidden",
                 animation: "slideUp 0.25s ease both",
-                transition: "background 0.3s ease, border-color 0.3s ease, transform 0.3s ease, opacity 0.3s ease",
-                transform: isConfirming ? "scale(0.98)" : "scale(1)",
-                opacity: isConfirming ? 0.85 : 1,
+                ...confirmTransition(isConfirming),
               }}>
                 {/* Compact row */}
                 <button
@@ -3150,18 +3131,9 @@ function GetAheadScreen({ rules, itemStates, ctx, onAction, queueState }) {
 
 // EXIT CHECKPOINT — adaptive based on shift scenario
 function ExitScreen({ rules, itemStates, ctx, setup, onAction, vaccineCount }) {
-  const [expandedItem, setExpandedItem] = useState(null);
+  const { expandedItem, setExpandedItem, justConfirmed, handleConfirm } = useItemConfirmState(onAction);
   const [showPassed, setShowPassed] = useState(false);
   const [showCovered, setShowCovered] = useState(false);
-  const [justConfirmed, setJustConfirmed] = useState(null);
-  const timerRef = useRef(null);
-  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
-  const handleConfirm = (ruleId, state) => {
-    if (timerRef.current) clearTimeout(timerRef.current);
-    haptic();
-    setJustConfirmed(ruleId);
-    timerRef.current = setTimeout(() => { onAction(ruleId, state); setExpandedItem(null); setJustConfirmed(null); timerRef.current = null; }, CONFIRM_FLASH_MS);
-  };
   const scenario = getHandoffScenario(setup);
 
   const { unresolved, covered, stillOpenExit } = useMemo(() => ({
@@ -3271,9 +3243,7 @@ function ExitScreen({ rules, itemStates, ctx, setup, onAction, vaccineCount }) {
                 border: `1px solid ${isConfirming ? MF.green + "60" : isAttention ? MF.amber + "4D" : isComp ? MF.compliance + "40" : MF.border}`,
                 borderLeft: `3px solid ${isConfirming ? MF.green : isAttention ? MF.amber : isComp ? MF.compliance : MF.accentMid}`,
                 borderRadius: MF.radius, overflow: "hidden",
-                transition: "background 0.3s ease, border-color 0.3s ease, transform 0.3s ease, opacity 0.3s ease",
-                transform: isConfirming ? "scale(0.98)" : "scale(1)",
-                opacity: isConfirming ? 0.85 : 1,
+                ...confirmTransition(isConfirming),
               }}>
                 <button
                   aria-expanded={isOpen}
