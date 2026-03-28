@@ -1706,17 +1706,14 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
 
   return (
     <div style={{ padding: "16px", animation: "fadeIn 0.2s ease" }}>
-      {/* Phase header */}
-      <div style={{ marginBottom: "10px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
-            <span style={{ fontSize: "13px", fontWeight: 600, color: MF.accent }}>{phaseLabel}</span>
-            <span style={{ fontSize: "11px", color: MF.textMuted, opacity: 0.6 }}>·</span>
-            <span style={{ fontSize: "11px", color: MF.textMuted }}>{ROLE_LABELS[setup.role]}</span>
-          </div>
-          <span style={{ fontSize: "12px", color: MF.textMuted }}>
-            {fmtTime12(ctx.currentMin)}
-          </span>
+      {/* Phase header — compact single line */}
+      <div style={{ marginBottom: "8px" }}>
+        <div style={{ fontSize: "12px", color: MF.textMuted, marginBottom: "5px", display: "flex", alignItems: "baseline", gap: "4px" }}>
+          <span style={{ fontWeight: 600, color: MF.accent }}>{phaseLabel}</span>
+          <span style={{ opacity: 0.4 }}>·</span>
+          <span>{ROLE_LABELS[setup.role]}</span>
+          <span style={{ opacity: 0.4 }}>·</span>
+          <span>{fmtTime12(ctx.currentMin)}</span>
         </div>
         <div style={{ width: "100%", height: "3px", background: MF.border, borderRadius: "2px", overflow: "hidden" }}>
           <div style={{
@@ -1727,25 +1724,29 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
         </div>
       </div>
 
-      {/* ── Workflow status — always at top, always editable ── */}
+      {/* ── Workflow status — full-width segmented control ── */}
       {onQueueState && setup.guidance !== "minimal" && (
         <div style={{
-          display: "flex", alignItems: "center", gap: "5px",
-          marginBottom: "12px",
+          display: "flex", gap: "0",
+          marginBottom: "10px",
+          border: `1px solid ${MF.border}`,
+          borderRadius: MF.radius,
+          overflow: "hidden",
         }}>
           {[
-            { key: "clear", label: "Clear", color: MF.green, bg: MF.greenDim },
+            { key: "clear", label: "Queues clear", color: MF.green, bg: MF.greenDim },
             { key: "ontrack", label: "On track", color: MF.accent, bg: MF.accentDim },
-            { key: "needsfocus", label: "Focus", color: MF.amber, bg: MF.amberDim },
-            { key: "highdemand", label: "High", color: MF.amber, bg: MF.amberDim },
-          ].map((q) => (
+            { key: "needsfocus", label: "Needs focus", color: MF.amber, bg: MF.amberDim },
+            { key: "highdemand", label: "High demand", color: MF.amber, bg: MF.amberDim },
+          ].map((q, i) => (
             <button
               key={q.key}
               onClick={() => onQueueState(q.key)}
               style={{
-                padding: "5px 10px", borderRadius: "14px", fontSize: "11px", fontWeight: 600,
+                flex: 1, padding: "8px 4px", fontSize: "11px", fontWeight: 600,
                 fontFamily: MF.font, cursor: "pointer", transition: "all 0.15s ease",
-                border: queueState === q.key ? `1.5px solid ${q.color}` : `1px solid ${MF.border}`,
+                border: "none",
+                borderRight: i < 3 ? `1px solid ${MF.border}` : "none",
                 background: queueState === q.key ? q.bg : "transparent",
                 color: queueState === q.key ? q.color : MF.textMuted,
               }}
@@ -1797,82 +1798,6 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
           </div>
         );
       })}
-
-      {/* Events — pending and arrived */}
-      {setup.expectedEvents && onEventArrival && (() => {
-        const expected = setup.expectedEvents;
-        const allEvents = [
-          { key: "warehouse", label: "Warehouse delivery", pendingDesc: "Tap when totes are in the pharmacy." },
-          { key: "ov", label: "OV order delivery", pendingDesc: "Tap when the outside vendor delivery arrives." },
-          { key: "usps", label: "USPS pickup", pendingDesc: "Tap when the USPS driver arrives." },
-        ].filter((e) => expected[e.key]);
-
-        if (allEvents.length === 0) return null;
-        const pending = allEvents.filter((e) => !eventArrivals[e.key]);
-        const arrived = allEvents.filter((e) => eventArrivals[e.key]);
-
-        return (
-          <div style={{ marginBottom: "14px" }}>
-            {pending.length > 0 && (
-              <>
-                <SectionLabel>Expecting today</SectionLabel>
-                {pending.map((e) => (
-                  <div key={e.key} style={{
-                    background: MF.card, border: `1px solid ${MF.border}`,
-                    borderLeft: `3px solid ${MF.secondary}`,
-                    borderRadius: MF.radius, padding: "10px 14px", marginBottom: "6px",
-                    display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px",
-                  }}>
-                    <div style={{ fontSize: "13px", fontWeight: 600 }}>{e.label}</div>
-                    <button
-                      onClick={() => onEventArrival(e.key, ctx.currentMin)}
-                      style={{
-                        ...btn("#fff", MF.accent),
-                        padding: "8px 14px", fontSize: "12px", flexShrink: 0, borderRadius: MF.radiusSm,
-                      }}
-                    >
-                      Arrived
-                    </button>
-                  </div>
-                ))}
-              </>
-            )}
-            {arrived.length > 0 && (
-              <>
-                <SectionLabel>Arrived today</SectionLabel>
-                {arrived.map((e) => (
-                  <div key={e.key} style={{
-                    background: MF.card, border: `1px solid ${MF.border}`,
-                    borderLeft: `3px solid ${MF.green}`,
-                    borderRadius: MF.radius, padding: "12px 16px", marginBottom: "8px",
-                    display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px",
-                  }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                      <span style={{ color: MF.green, display: "flex" }}>{I.check}</span>
-                      <span style={{ fontSize: "13px", fontWeight: 500 }}>{e.label}</span>
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                      <select
-                        value={eventArrivals[e.key]}
-                        onChange={(ev) => onEventArrival(e.key, +ev.target.value)}
-                        style={{
-                          background: MF.card, border: `1px solid ${MF.border}`, borderRadius: "6px",
-                          color: MF.text, fontSize: "12px", fontFamily: MF.font,
-                          padding: "4px 24px 4px 8px", cursor: "pointer",
-                          appearance: "none", outline: "none",
-                          backgroundImage: "none",
-                        }}
-                      >
-                        {TIME_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                      </select>
-                    </div>
-                  </div>
-                ))}
-              </>
-            )}
-          </div>
-        );
-      })()}
 
       {/* Pressure indicator */}
       {highPressure && (
@@ -2092,6 +2017,72 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
           ))}
         </div>
       )}
+
+      {/* Events — demoted, shown below active items */}
+      {setup.expectedEvents && onEventArrival && (() => {
+        const expected = setup.expectedEvents;
+        const allEvents = [
+          { key: "warehouse", label: "Warehouse delivery" },
+          { key: "ov", label: "OV order delivery" },
+          { key: "usps", label: "USPS pickup" },
+        ].filter((e) => expected[e.key]);
+
+        if (allEvents.length === 0) return null;
+        const pending = allEvents.filter((e) => !eventArrivals[e.key]);
+        const arrived = allEvents.filter((e) => eventArrivals[e.key]);
+
+        if (pending.length === 0 && arrived.length === 0) return null;
+        return (
+          <div style={{ marginTop: "12px" }}>
+            {pending.length > 0 && pending.map((e) => (
+              <div key={e.key} style={{
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                padding: "8px 12px", marginBottom: "4px",
+                background: "transparent", border: `1px solid ${MF.border}`,
+                borderRadius: MF.radiusSm,
+              }}>
+                <span style={{ fontSize: "12px", color: MF.textMuted }}>{e.label}</span>
+                <button
+                  onClick={() => onEventArrival(e.key, ctx.currentMin)}
+                  style={{
+                    padding: "4px 10px", fontSize: "11px", fontWeight: 600,
+                    fontFamily: MF.font, cursor: "pointer",
+                    border: `1px solid ${MF.border}`, borderRadius: MF.radiusSm,
+                    background: "transparent", color: MF.textMuted,
+                  }}
+                >
+                  Arrived
+                </button>
+              </div>
+            ))}
+            {arrived.map((e) => (
+              <div key={e.key} style={{
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                padding: "8px 12px", marginBottom: "4px",
+                background: "transparent", border: `1px solid ${MF.border}`,
+                borderRadius: MF.radiusSm,
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  <span style={{ color: MF.green, display: "flex" }}>{I.check}</span>
+                  <span style={{ fontSize: "12px", color: MF.textMuted }}>{e.label}</span>
+                </div>
+                <select
+                  value={eventArrivals[e.key]}
+                  onChange={(ev) => onEventArrival(e.key, +ev.target.value)}
+                  style={{
+                    background: "transparent", border: `1px solid ${MF.border}`, borderRadius: "6px",
+                    color: MF.textMuted, fontSize: "11px", fontFamily: MF.font,
+                    padding: "3px 20px 3px 6px", cursor: "pointer",
+                    appearance: "none", outline: "none",
+                  }}
+                >
+                  {TIME_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
 
       {/* ── Immunization tracker ── */}
       {setup.immTarget > 0 && onVaccine && (
