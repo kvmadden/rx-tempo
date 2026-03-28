@@ -541,7 +541,7 @@ function computeItemStates(rules, prevStates, setup, ctx, queueState, checkConfi
     // when queue pressure has escalated since they were last confirmed.
     // Situation-aware: "waiters check" confirmed during calm → resurface when it gets busy.
     if (prev === S.CONFIRMED || prev === S.HANDLED_EARLY || prev === S.NOT_APPLICABLE) {
-      const isCheck = (rule.itemType || "task") === "check";
+      const isCheck = isCheckItem(rule);
       const confirmedPressure = confirmedAt[rule.id];
       const pressureEscalated = isCheck && confirmedPressure !== undefined &&
         (PRESSURE_RANK[q] || 0) > (PRESSURE_RANK[confirmedPressure] || 0);
@@ -561,11 +561,11 @@ function computeItemStates(rules, prevStates, setup, ctx, queueState, checkConfi
     }
 
     // ShiftType suppression (compliance items always surface regardless of shift type)
-    if (suppressOpening && rule.category === "opening" && rule.itemType !== "compliance") {
+    if (suppressOpening && rule.category === "opening" && !isComplianceItem(rule)) {
       result[rule.id] = S.HIDDEN;
       continue;
     }
-    if (suppressDeadline && (rule.category === "deadline" || rule.category === "exit") && rule.itemType !== "compliance") {
+    if (suppressDeadline && (rule.category === "deadline" || rule.category === "exit") && !isComplianceItem(rule)) {
       result[rule.id] = S.HIDDEN;
       continue;
     }
@@ -588,12 +588,8 @@ function computeItemStates(rules, prevStates, setup, ctx, queueState, checkConfi
       continue;
     }
 
-    // Compliance items are never suppressed by queue state
-    if (rule.itemType === "compliance") {
-      // fall through to normal window logic
-    } else
-    // Needs focus: suppress low-risk items that aren't already visible
-    if (q === "needsfocus" && rule.riskWeight === "low" && prev !== S.VISIBLE && prev !== S.VISIBLE_HANDOFF) {
+    // Needs focus: suppress low-risk non-compliance items that aren't already visible
+    if (!isComplianceItem(rule) && q === "needsfocus" && rule.riskWeight === "low" && prev !== S.VISIBLE && prev !== S.VISIBLE_HANDOFF) {
       result[rule.id] = S.HIDDEN;
       continue;
     }
@@ -606,7 +602,7 @@ function computeItemStates(rules, prevStates, setup, ctx, queueState, checkConfi
 
     if (inWin) {
       // Hard cap: don't surface more than MAX_VISIBLE low-risk items (high-risk + compliance exempt)
-      if (visibleCount >= MAX_VISIBLE && rule.riskWeight === "low" && rule.itemType !== "compliance") {
+      if (visibleCount >= MAX_VISIBLE && rule.riskWeight === "low" && !isComplianceItem(rule)) {
         result[rule.id] = S.HIDDEN;
         continue;
       }
@@ -863,14 +859,17 @@ function Brand({ size = 17, compact = false, dim = false }) {
 // ─── COMPONENTS ───
 
 // Select field
+let selectIdCounter = 0;
 function SelectField({ label, value, onChange, options, style: extraStyle }) {
+  const [selectId] = useState(() => `select-${++selectIdCounter}`);
   return (
     <div style={{ marginBottom: "20px", ...extraStyle }}>
-      <label style={{ fontSize: "12px", fontWeight: 600, color: MF.textMuted, marginBottom: "8px", display: "block", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+      <label htmlFor={selectId} style={{ fontSize: "12px", fontWeight: 600, color: MF.textMuted, marginBottom: "8px", display: "block", textTransform: "uppercase", letterSpacing: "0.06em" }}>
         {label}
       </label>
       <div style={{ position: "relative" }}>
         <select
+          id={selectId}
           style={{ width: "100%", background: MF.card, color: MF.text, border: `1px solid ${MF.border}`, borderRadius: MF.radiusSm, padding: "12px 40px 12px 14px", fontSize: "15px", fontFamily: MF.font, appearance: "none", cursor: "pointer" }}
           value={value}
           onChange={(e) => onChange(e.target.value)}
@@ -933,6 +932,13 @@ function QuietState({ message, sub }) {
 function InfoPanel({ show, onClose }) {
   const [expanded, setExpanded] = useState(null);
   const toggle = (key) => setExpanded((prev) => prev === key ? null : key);
+
+  useEffect(() => {
+    if (!show) return;
+    const handleKey = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [show, onClose]);
 
   if (!show) return null;
 
@@ -1042,11 +1048,11 @@ function InfoPanel({ show, onClose }) {
   ];
 
   return (
-    <div style={{
+    <div role="dialog" aria-modal="true" aria-label="About RxTempo" style={{
       position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 200,
       display: "flex", justifyContent: "flex-end",
     }}>
-      <div onClick={onClose} style={{
+      <div onClick={onClose} aria-hidden="true" style={{
         position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
         background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)",
         animation: "fadeIn 0.2s ease",
@@ -1059,7 +1065,7 @@ function InfoPanel({ show, onClose }) {
       }}>
         {/* Header — centered brand + tagline */}
         <div style={{ textAlign: "center", marginBottom: "16px", position: "relative" }}>
-          <button onClick={onClose} style={{
+          <button aria-label="Close" onClick={onClose} style={{
             position: "absolute", top: 0, right: 0,
             background: "none", border: `1px solid ${MF.border}`, borderRadius: "6px",
             padding: "4px 8px", cursor: "pointer", color: MF.textMuted,
@@ -1080,6 +1086,7 @@ function InfoPanel({ show, onClose }) {
           {sections.map((s) => (
             <div key={s.key}>
               <button
+                aria-expanded={expanded === s.key}
                 onClick={() => toggle(s.key)}
                 style={{
                   width: "100%", display: "flex", alignItems: "center", gap: "10px",
@@ -1443,6 +1450,7 @@ function StartDayScreen({ onComplete }) {
                 width: "100%", letterSpacing: "-0.01em",
                 opacity: shiftValid ? 1 : 0.5,
               }}
+              aria-disabled={!shiftValid}
               onClick={() => shiftValid && setStep("form2")}
             >
               Next
@@ -1796,6 +1804,7 @@ function StartDayScreen({ onComplete }) {
                   flex: 2, letterSpacing: "-0.01em",
                   opacity: canProceed ? 1 : 0.5,
                 }}
+                aria-disabled={!canProceed}
                 onClick={() => {
                   if (canProceed) {
                     // Auto-fill empty immunization target
@@ -2141,6 +2150,7 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
                   animation: "slideUp 0.25s ease both",
                 }}>
                   <button
+                    aria-expanded={isOpen}
                     onClick={() => setExpandedItem(isOpen ? null : r.id)}
                     style={{
                       width: "100%", display: "flex", alignItems: "center", gap: "8px",
@@ -2238,6 +2248,7 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
               }}>
                 {/* Compact row — always visible */}
                 <button
+                  aria-expanded={isOpen}
                   onClick={() => setExpandedItem(isOpen ? null : r.id)}
                   style={{
                     width: "100%", display: "flex", alignItems: "center", gap: "8px",
@@ -2406,6 +2417,7 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
                 borderRadius: MF.radius, overflow: "hidden",
               }}>
                 <button
+                  aria-expanded={isOpen}
                   onClick={() => setExpandedItem(isOpen ? null : `still-${r.id}`)}
                   style={{
                     width: "100%", display: "flex", alignItems: "center", gap: "8px",
@@ -2814,6 +2826,7 @@ function ArrivalScreen({ rules, itemStates, ctx, onAction, setup }) {
                 opacity: isConfirming ? 0.85 : 1,
               }}>
                 <button
+                  aria-expanded={isOpen}
                   onClick={() => setExpandedItem(isOpen ? null : r.id)}
                   style={{
                     width: "100%", display: "flex", alignItems: "center", gap: "8px",
@@ -2928,6 +2941,7 @@ function LaterTodayScreen({ rules, itemStates, setup, ctx, onAction }) {
               }}>
                 {/* Compact row */}
                 <button
+                  aria-expanded={isOpen}
                   onClick={() => setExpandedItem(isOpen ? null : r.id)}
                   style={{
                     width: "100%", display: "flex", alignItems: "center", gap: "8px",
@@ -3059,6 +3073,7 @@ function GetAheadScreen({ rules, itemStates, ctx, onAction, queueState }) {
               }}>
                 {/* Compact row */}
                 <button
+                  aria-expanded={isOpen}
                   onClick={() => setExpandedItem(isOpen ? null : r.id)}
                   style={{
                     width: "100%", display: "flex", alignItems: "center", gap: "8px",
@@ -3232,6 +3247,7 @@ function ExitScreen({ rules, itemStates, ctx, setup, onAction, vaccineCount }) {
                 opacity: isConfirming ? 0.85 : 1,
               }}>
                 <button
+                  aria-expanded={isOpen}
                   onClick={() => setExpandedItem(isOpen ? null : r.id)}
                   style={{
                     width: "100%", display: "flex", alignItems: "center", gap: "8px",
@@ -3314,6 +3330,7 @@ function ExitScreen({ rules, itemStates, ctx, setup, onAction, vaccineCount }) {
                 borderRadius: MF.radius, overflow: "hidden",
               }}>
                 <button
+                  aria-expanded={isOpen}
                   onClick={() => setExpandedItem(isOpen ? null : `passed-${r.id}`)}
                   style={{
                     width: "100%", display: "flex", alignItems: "center", gap: "8px",
@@ -3595,7 +3612,7 @@ export default function RxTempo() {
     // Track queue pressure at confirmation time for checks (enables situation-aware resurfacing)
     if (newState === S.CONFIRMED || newState === S.HANDLED_EARLY) {
       const rule = activeRules.find((r) => r.id === ruleId);
-      if (rule && (rule.itemType || "task") === "check") {
+      if (rule && isCheckItem(rule)) {
         setCheckConfirmedAt((prev) => ({ ...prev, [ruleId]: queueState }));
       }
     }
