@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 
 // ─── RULE TABLE: Real pharmacy content with full behavior contracts ───
 const RULES = [
@@ -105,7 +105,7 @@ const RULES = [
     roleContext: "Best done during a calm stretch.",
     carryLogic: "carry",
     handoffEligibility: null,
-    getAheadEligible: true,
+    getAheadEligible: false,
     riskWeight: "low",
   },
   {
@@ -197,7 +197,7 @@ const RULES = [
     roleContext: "Frees up inventory for patients who need it.",
     carryLogic: "carry",
     handoffEligibility: "exit",
-    getAheadEligible: true,
+    getAheadEligible: false,
     riskWeight: "high",
   },
   {
@@ -273,7 +273,7 @@ const RULES = [
     description: "Expired product on the shelf is a dispensing risk and a compliance issue. Pulling it now means one less thing to worry about later.",
     category: "getahead",
     itemType: "task",
-    usualWindow: { startOffset: 60, endOffset: -60 },
+    usualWindow: { startOffset: 60, endOffset: -30 },
     roleContext: "Calm moment? Protect the shelves.",
     carryLogic: "carry",
     handoffEligibility: null,
@@ -286,7 +286,7 @@ const RULES = [
     description: "A tidy shelf means faster pulls and fewer pick errors. It's a small investment that speeds up everyone's workflow for the rest of the day.",
     category: "getahead",
     itemType: "task",
-    usualWindow: { startOffset: 60, endOffset: -60 },
+    usualWindow: { startOffset: 60, endOffset: -30 },
     roleContext: "Faster pulls, fewer errors.",
     carryLogic: "carry",
     handoffEligibility: null,
@@ -299,7 +299,7 @@ const RULES = [
     description: "Getting ahead on tomorrow's counts means tomorrow's team starts with a cleaner board. Good days are built the shift before.",
     category: "getahead",
     itemType: "task",
-    usualWindow: { startOffset: 120, endOffset: -60 },
+    usualWindow: { startOffset: 120, endOffset: -30 },
     roleContext: "Tomorrow's team will thank you.",
     carryLogic: "carry",
     handoffEligibility: null,
@@ -356,7 +356,7 @@ const RULES = [
     roleContext: "Prevents empty-handed pickups.",
     carryLogic: "carry",
     handoffEligibility: null,
-    getAheadEligible: true,
+    getAheadEligible: false,
     riskWeight: "medium",
   },
 ];
@@ -410,7 +410,6 @@ const S = {
   CONFIRMED: "confirmed",
   NOT_APPLICABLE: "not_applicable",
   NEEDS_ATTENTION: "needs_attention",
-  EXPIRED: "expired",
 };
 
 // Pressure ranking for situation-aware check resurfacing
@@ -606,7 +605,7 @@ function computeItemStates(rules, prevStates, setup, ctx, queueState, checkConfi
     }
 
     if (inWin) {
-      // Hard cap: don't surface more than MAX_VISIBLE items (compliance exempt)
+      // Hard cap: don't surface more than MAX_VISIBLE low-risk items (high-risk + compliance exempt)
       if (visibleCount >= MAX_VISIBLE && rule.riskWeight === "low" && rule.itemType !== "compliance") {
         result[rule.id] = S.HIDDEN;
         continue;
@@ -721,7 +720,7 @@ const THEMES = {
     complianceDim: "rgba(201,114,126,0.12)",
     danger: "#F85149",
     dangerDim: "rgba(248,81,73,0.12)",
-    mutedBg: MF.mutedBg,
+    mutedBg: "rgba(139,148,158,0.08)",
     gradient: "linear-gradient(135deg, #4A9EFF 0%, #3A7FCC 100%)",
     topBarBg: "rgba(15,17,20,0.95)",
     navBg: "rgba(15,17,20,0.95)",
@@ -842,7 +841,7 @@ function SelectField({ label, value, onChange, options, style: extraStyle }) {
       </label>
       <div style={{ position: "relative" }}>
         <select
-          style={{ width: "100%", background: MF.card, color: MF.text, border: `1px solid ${MF.border}`, borderRadius: MF.radiusSm, padding: "12px 40px 12px 14px", fontSize: "15px", fontFamily: MF.font, appearance: "none", cursor: "pointer", outline: "none" }}
+          style={{ width: "100%", background: MF.card, color: MF.text, border: `1px solid ${MF.border}`, borderRadius: MF.radiusSm, padding: "12px 40px 12px 14px", fontSize: "15px", fontFamily: MF.font, appearance: "none", cursor: "pointer" }}
           value={value}
           onChange={(e) => onChange(e.target.value)}
         >
@@ -1296,10 +1295,12 @@ function StartDayScreen({ onComplete }) {
 
   // Ensure current shiftType is in valid list, otherwise auto-correct
   const validTypes = getValidShiftTypes();
-  if (shiftValid && !validTypes.find((t) => t.value === shiftType)) {
-    const inferred = inferShiftType(shiftStart, shiftEnd, storeOpen, storeClose);
-    if (inferred !== shiftType) setShiftType(inferred);
-  }
+  useEffect(() => {
+    if (shiftValid && !validTypes.find((t) => t.value === shiftType)) {
+      const inferred = inferShiftType(shiftStart, shiftEnd, storeOpen, storeClose);
+      if (inferred !== shiftType) setShiftType(inferred);
+    }
+  }, [shiftValid, shiftType, shiftStart, shiftEnd, storeOpen, storeClose]);
 
   const stepTitles = ["Your shift", "Coverage & events", "Goals & notes"];
   const totalSteps = 3;
@@ -1472,7 +1473,13 @@ function StartDayScreen({ onComplete }) {
                 }));
               };
               const addWindow = () => {
-                setOverlapWindows((prev) => [...prev, { start: +shiftStart + 120, end: +shiftEnd }]);
+                const s = +shiftStart, e = +shiftEnd;
+                const isOvernight = e < s;
+                // Default start: 2hrs into shift (clamped to shift bounds)
+                let wStart = s + 120;
+                if (!isOvernight && wStart >= e) wStart = Math.max(s, e - 60);
+                if (isOvernight) wStart = wStart % 1440;
+                setOverlapWindows((prev) => [...prev, { start: wStart, end: e }]);
               };
               const removeWindow = (idx) => {
                 setOverlapWindows((prev) => prev.filter((_, i) => i !== idx));
@@ -1649,7 +1656,6 @@ function StartDayScreen({ onComplete }) {
                   border: `1px solid ${immZero ? MF.danger : immTooLow && !immLowConfirmed ? MF.amber : MF.border}`,
                   borderRadius: MF.radiusSm,
                   padding: "12px 14px", fontSize: "15px", fontFamily: MF.font,
-                  outline: "none",
                 }}
               />
               {immZero && (
@@ -1714,7 +1720,6 @@ function StartDayScreen({ onComplete }) {
                       flex: 1, background: MF.card, color: MF.text,
                       border: `1px solid ${MF.border}`, borderRadius: MF.radiusSm,
                       padding: "12px 14px", fontSize: "15px", fontFamily: MF.font,
-                      outline: "none",
                     }}
                   />
                   {dayNotes.length > 1 && (
@@ -1788,6 +1793,7 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
   const [justConfirmed, setJustConfirmed] = useState(null);
   const [confirmTimestamps, setConfirmTimestamps] = useState([]);
   const [confirmSkipCompliance, setConfirmSkipCompliance] = useState(null); // ruleId being skip-confirmed
+  const confirmTimerRef = useRef(null);
 
   const WEIGHT_RANK = { high: 0, medium: 1, low: 2 };
   const MAX_SHOWN = 4;
@@ -1836,14 +1842,19 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
   const recentConfirms = confirmTimestamps.filter((t) => Date.now() - t < 15 * 60 * 1000);
   const onAStreak = showEncouragement && recentConfirms.length >= 3;
 
+  useEffect(() => () => { if (confirmTimerRef.current) clearTimeout(confirmTimerRef.current); }, []);
+
   const handleConfirm = (ruleId) => {
+    if (confirmTimerRef.current) clearTimeout(confirmTimerRef.current);
     setJustConfirmed(ruleId);
-    setConfirmTimestamps((prev) => [...prev, Date.now()]);
+    const now = Date.now();
+    setConfirmTimestamps((prev) => [...prev.filter((t) => now - t < 15 * 60 * 1000), now]);
     const flashDuration = isFirstConfirm ? 600 : 400;
-    setTimeout(() => {
+    confirmTimerRef.current = setTimeout(() => {
       onAction(ruleId, S.CONFIRMED);
       setExpandedItem(null);
       setJustConfirmed(null);
+      confirmTimerRef.current = null;
     }, flashDuration);
   };
 
@@ -2514,7 +2525,7 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
                     background: "transparent", border: `1px solid ${MF.border}`, borderRadius: "6px",
                     color: MF.textMuted, fontSize: "11px", fontFamily: MF.font,
                     padding: "3px 20px 3px 6px", cursor: "pointer",
-                    appearance: "none", outline: "none",
+                    appearance: "none",
                   }}
                 >
                   {TIME_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -2698,9 +2709,12 @@ function getHandoffScenario(setup) {
 function ArrivalScreen({ rules, itemStates, ctx, onAction, setup }) {
   const [expandedItem, setExpandedItem] = useState(null);
   const [justConfirmed, setJustConfirmed] = useState(null);
+  const timerRef = useRef(null);
+  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
   const handleConfirm = (ruleId, state) => {
+    if (timerRef.current) clearTimeout(timerRef.current);
     setJustConfirmed(ruleId);
-    setTimeout(() => { onAction(ruleId, state); setExpandedItem(null); setJustConfirmed(null); }, 400);
+    timerRef.current = setTimeout(() => { onAction(ruleId, state); setExpandedItem(null); setJustConfirmed(null); timerRef.current = null; }, 400);
   };
   const scenario = getHandoffScenario(setup);
   const items = rules.filter((r) =>
@@ -2858,9 +2872,12 @@ function LaterTodayScreen({ rules, itemStates, setup, ctx, onAction }) {
   const [expandedItem, setExpandedItem] = useState(null);
   const [showAll, setShowAll] = useState(false);
   const [justConfirmed, setJustConfirmed] = useState(null);
+  const timerRef = useRef(null);
+  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
   const handleConfirm = (ruleId, state) => {
+    if (timerRef.current) clearTimeout(timerRef.current);
     setJustConfirmed(ruleId);
-    setTimeout(() => { onAction(ruleId, state); setExpandedItem(null); setJustConfirmed(null); }, 400);
+    timerRef.current = setTimeout(() => { onAction(ruleId, state); setExpandedItem(null); setJustConfirmed(null); timerRef.current = null; }, 400);
   };
   const MAX_SHOWN = 5;
 
@@ -2994,9 +3011,12 @@ function LaterTodayScreen({ rules, itemStates, setup, ctx, onAction }) {
 function GetAheadScreen({ rules, itemStates, ctx, onAction, queueState }) {
   const [expandedItem, setExpandedItem] = useState(null);
   const [justConfirmed, setJustConfirmed] = useState(null);
+  const timerRef = useRef(null);
+  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
   const handleConfirm = (ruleId, state) => {
+    if (timerRef.current) clearTimeout(timerRef.current);
     setJustConfirmed(ruleId);
-    setTimeout(() => { onAction(ruleId, state); setExpandedItem(null); setJustConfirmed(null); }, 400);
+    timerRef.current = setTimeout(() => { onAction(ruleId, state); setExpandedItem(null); setJustConfirmed(null); timerRef.current = null; }, 400);
   };
 
   const eligible = rules.filter((r) =>
@@ -3099,9 +3119,12 @@ function ExitScreen({ rules, itemStates, ctx, setup, onAction, vaccineCount }) {
   const [showPassed, setShowPassed] = useState(false);
   const [showCovered, setShowCovered] = useState(false);
   const [justConfirmed, setJustConfirmed] = useState(null);
+  const timerRef = useRef(null);
+  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
   const handleConfirm = (ruleId, state) => {
+    if (timerRef.current) clearTimeout(timerRef.current);
     setJustConfirmed(ruleId);
-    setTimeout(() => { onAction(ruleId, state); setExpandedItem(null); setJustConfirmed(null); }, 400);
+    timerRef.current = setTimeout(() => { onAction(ruleId, state); setExpandedItem(null); setJustConfirmed(null); timerRef.current = null; }, 400);
   };
   const scenario = getHandoffScenario(setup);
 
@@ -3601,9 +3624,12 @@ export default function RxTempo() {
   }, [activeRules, queueState]);
 
   // Auto-return: after acting on arrival/exit items, return to Home after a beat
+  const actionReturnRef = useRef(null);
+  useEffect(() => () => { if (actionReturnRef.current) clearTimeout(actionReturnRef.current); }, []);
   const handleActionAndReturn = useCallback((ruleId, newState) => {
     handleAction(ruleId, newState);
-    setTimeout(() => setScreen("home"), 600);
+    if (actionReturnRef.current) clearTimeout(actionReturnRef.current);
+    actionReturnRef.current = setTimeout(() => { setScreen("home"); actionReturnRef.current = null; }, 600);
   }, [handleAction]);
 
   const handleSetup = (data) => {
@@ -3622,6 +3648,8 @@ export default function RxTempo() {
     setEventArrivals({});
     setQueueState("ontrack");
     setVaccineCount(0);
+    setDayNoteStates({});
+    setDayNoteConfirm(null);
     setScreen("landing");
     setSimMode(false);
     setSimTime(null);
@@ -3645,6 +3673,7 @@ export default function RxTempo() {
     @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
     @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     @keyframes slideInRight { from { transform: translateX(100%); } to { transform: translateX(0); } }
+    @keyframes errorPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     select option { background: ${MF.selectBg}; color: ${MF.selectText}; }
     ::-webkit-scrollbar { width: 3px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: ${MF.border}; border-radius: 3px; }
@@ -3660,7 +3689,6 @@ export default function RxTempo() {
       <div style={{ fontFamily: MF.font, background: MF.bg, color: MF.text, minHeight: "100vh", maxWidth: "430px", margin: "0 auto", overflow: "hidden" }}>
         <style>{globalCSS}{`
           @keyframes pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 0.7; } }
-          @keyframes errorPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
           @keyframes gradientShift { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
           @keyframes revealUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
           @keyframes revealScale { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } }
@@ -3678,14 +3706,14 @@ export default function RxTempo() {
             }}>
               <Brand compact />
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <button onClick={toggleTheme} style={{
+                <button aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"} onClick={toggleTheme} style={{
                   background: "none", border: `1px solid ${MF.border}`, borderRadius: "8px",
                   padding: "6px", cursor: "pointer", color: MF.textMuted,
                   display: "flex", alignItems: "center", justifyContent: "center",
                 }}>
                   {theme === "dark" ? I.sun : I.moon}
                 </button>
-                <button onClick={() => setShowInfo(!showInfo)} style={{
+                <button aria-label="About RxTempo" onClick={() => setShowInfo(!showInfo)} style={{
                   background: "none", border: `1px solid ${showInfo ? MF.accent : MF.border}`, borderRadius: "8px",
                   padding: "6px", cursor: "pointer", color: showInfo ? MF.accent : MF.textMuted,
                   display: "flex", alignItems: "center", justifyContent: "center",
@@ -3713,7 +3741,7 @@ export default function RxTempo() {
               borderRadius: "50%",
               background: theme === "dark"
                 ? "radial-gradient(circle, rgba(74,158,255,0.07) 0%, transparent 70%)"
-                : "radial-gradient(circle, rgba(74,158,255,0.04) 0%, transparent 70%)",
+                : "radial-gradient(circle, rgba(45,122,191,0.06) 0%, transparent 70%)",
               animation: "pulse 6s ease-in-out infinite", pointerEvents: "none",
             }} />
             <div style={{
@@ -3721,7 +3749,7 @@ export default function RxTempo() {
               borderRadius: "50%",
               background: theme === "dark"
                 ? "radial-gradient(circle, rgba(126,184,240,0.05) 0%, transparent 70%)"
-                : "radial-gradient(circle, rgba(126,184,240,0.03) 0%, transparent 70%)",
+                : "radial-gradient(circle, rgba(90,158,214,0.04) 0%, transparent 70%)",
               animation: "pulse 8s ease-in-out infinite 2s", pointerEvents: "none",
             }} />
 
@@ -3735,14 +3763,14 @@ export default function RxTempo() {
             }}>
               <Brand dim />
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <button onClick={toggleTheme} style={{
+                <button aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"} onClick={toggleTheme} style={{
                   background: "none", border: `1px solid ${MF.border}`, borderRadius: "8px",
                   padding: "6px", cursor: "pointer", color: MF.textMuted,
                   display: "flex", alignItems: "center", justifyContent: "center",
                 }}>
                   {theme === "dark" ? I.sun : I.moon}
                 </button>
-                <button onClick={() => setShowInfo(!showInfo)} style={{
+                <button aria-label="About RxTempo" onClick={() => setShowInfo(!showInfo)} style={{
                   background: "none", border: `1px solid ${showInfo ? MF.accent : MF.border}`, borderRadius: "8px",
                   padding: "6px", cursor: "pointer", color: showInfo ? MF.accent : MF.textMuted,
                   display: "flex", alignItems: "center", justifyContent: "center",
@@ -3938,14 +3966,14 @@ export default function RxTempo() {
       }}>
         <Brand compact />
         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-          <button onClick={toggleTheme} style={{
+          <button aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"} onClick={toggleTheme} style={{
             background: "none", border: `1px solid ${MF.border}`, borderRadius: "6px",
             padding: "4px", cursor: "pointer", color: MF.textMuted,
             display: "flex", alignItems: "center", justifyContent: "center",
           }}>
             {theme === "dark" ? I.sun : I.moon}
           </button>
-          <button onClick={() => setShowInfo(!showInfo)} style={{
+          <button aria-label="About RxTempo" onClick={() => setShowInfo(!showInfo)} style={{
             background: "none", border: `1px solid ${showInfo ? MF.accent : MF.border}`, borderRadius: "6px",
             padding: "4px", cursor: "pointer", color: showInfo ? MF.accent : MF.textMuted,
             display: "flex", alignItems: "center", justifyContent: "center",
@@ -3953,6 +3981,7 @@ export default function RxTempo() {
             {I.info}
           </button>
           <button
+            aria-label={simMode ? "Exit simulation" : "Simulate time"}
             onClick={() => { setSimMode(!simMode); if (!simMode && simTime === null) setSimTime(setup.shiftStart); }}
             style={{
               background: "none", border: `1px solid ${simMode ? MF.accent : MF.border}`, borderRadius: "6px",
@@ -3963,6 +3992,7 @@ export default function RxTempo() {
             {I.sim}
           </button>
           <button
+            aria-label="Reset shift"
             onClick={handleReset}
             style={{
               background: "none", border: `1px solid ${MF.border}`, borderRadius: "6px",
