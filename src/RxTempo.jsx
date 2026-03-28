@@ -511,11 +511,13 @@ function computeItemStates(rules, prevStates, setup, ctx) {
 }
 
 // ─── PACING LANGUAGE ───
-function getPacingLine(ctx, visibleCount, coverageMode, queueState, coveredCount) {
+function getPacingLine(ctx, visibleCount, coverageMode, queueState, coveredCount, totalActionable) {
   if (!ctx) return "";
   const mode = coverageMode || "solo";
   const q = queueState || "ontrack";
   const c = coveredCount || 0;
+  const total = totalActionable || 1;
+  const pct = total > 0 ? c / total : 0;
 
   // High demand override — protective
   if (q === "highdemand") {
@@ -523,15 +525,22 @@ function getPacingLine(ctx, visibleCount, coverageMode, queueState, coveredCount
     return "High demand. Showing only what's essential.";
   }
 
+  // Milestone checks — these feel good
+  if (c > 0 && visibleCount <= 3) {
+    if (pct >= 0.75 && visibleCount > 0) return `Home stretch — ${visibleCount} left.`;
+    if (pct >= 0.5 && pct < 0.75 && visibleCount > 0) return `Past the halfway mark. ${visibleCount} on the board.`;
+  }
+
   if (visibleCount === 0) {
     if (c >= 10) return `Board clear — ${c} handled this shift.`;
     if (c >= 5) return `${c} covered. Nothing left right now.`;
+    if (c > 0 && pct >= 0.75) return `Nearly everything handled. Nice shift.`;
     if (c > 0) return `${c} down. Clear board.`;
     if (ctx.timingPressure === "early") return "Settling in. Nothing pressing yet.";
     if (ctx.exitWindow) return "Almost done. Nothing left to surface.";
     if (ctx.timingPressure === "end-of-day") return "Wrapping up. Nothing left to surface.";
     if (ctx.timingPressure === "tightening") return "Window is tightening, but you're clear.";
-    if (q === "clear") return "All clear. Good time for immunization conversations or getting ahead.";
+    if (q === "clear") return "All clear. Good time for conversations or getting ahead.";
     return "Nothing pressing right now. Steady window.";
   }
   if (visibleCount === 1) {
@@ -787,7 +796,7 @@ function ItemCard({ rule, state, onAction, showRole = true, timingPressure }) {
               Still needs attention
             </button>
             <button style={btn(MF.textMuted, "rgba(139,148,158,0.08)")} onClick={() => onAction(rule.id, S.NOT_APPLICABLE)}>
-              Not needed today
+              Skip for today
             </button>
           </div>
         </div>
@@ -924,7 +933,7 @@ function InfoPanel({ show, onClose }) {
         <Line label="What" value="Window passed, not yet actioned" />
         <Line label="Already handled" value="Confirm it — moves to covered" />
         <Line label="Still needs attention" value="Flags it for follow-up" />
-        <Line label="Not needed today" value="Dismisses cleanly" />
+        <Line label="Skip for today" value="Dismisses cleanly" />
       </>
     )},
     { key: "leader", title: "For leadership", icon: "◆", render: () => (
@@ -1734,7 +1743,7 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
     return win.end < ctx.currentMin && win.end > 0;
   });
 
-  const pacingLine = getPacingLine(ctx, visible.length, ctx.coverageMode, queueState, coveredCount);
+  const pacingLine = getPacingLine(ctx, visible.length, ctx.coverageMode, queueState, coveredCount, totalActionable);
   const phaseLabel = getPhaseLabel(ctx);
   const highPressure = visible.length > 5 || queueState === "highdemand";
 
@@ -1946,7 +1955,7 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
                         Still needs attention
                       </button>
                       <button style={btn(MF.textMuted, "rgba(139,148,158,0.08)")} onClick={() => { onAction(r.id, S.NOT_APPLICABLE); setExpandedItem(null); }}>
-                        Not needed today
+                        Skip for today
                       </button>
                     </div>
                   </div>
@@ -2019,7 +2028,7 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
                 background: showStillOpen ? MF.amberDim : "transparent",
                 color: MF.amber,
               }}>
-                {stillOpen.length} still open
+                {stillOpen.length} remaining
               </button>
             )}
             {confirmed.length > 0 && (
@@ -2062,7 +2071,7 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
                       Still needs attention
                     </button>
                     <button style={btn(MF.textMuted, "rgba(139,148,158,0.08)")} onClick={() => onAction(r.id, S.NOT_APPLICABLE)}>
-                      Not needed today
+                      Skip for today
                     </button>
                   </div>
                 </div>
@@ -2181,9 +2190,9 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
                 }} />
               </div>
               <div style={{ fontSize: "12px", color: MF.textMuted, marginBottom: "12px", fontStyle: "italic" }}>
-                {vaccineCount >= setup.immTarget ? "You've met today's target." :
+                {vaccineCount >= setup.immTarget ? "Target met. Well done." :
                  vaccineCount > 0 ? "Keep it up — every conversation matters." :
-                 "Immunizations remain an important part of patient care."}
+                 "Each one protects someone. You've got this."}
               </div>
               <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
                 <button
@@ -2239,7 +2248,7 @@ function ArrivalScreen({ rules, itemStates, ctx, onAction }) {
           sub={ctx.inOverlap ? "You're mid-overlap — check Home for the live board." : "This screen activates when an overlap window starts."}
         />
       ) : items.length === 0 ? (
-        <QuietState message="Nothing specific for the handshake." sub="Everything looks covered." />
+        <QuietState message="Nothing specific for the handshake." sub="You're aligned. Good to go." />
       ) : (
         <>
           <div style={{
@@ -2279,7 +2288,7 @@ function LaterTodayScreen({ rules, itemStates, setup, ctx, onAction }) {
       />
 
       {laterItems.length === 0 ? (
-        <QuietState message="Nothing upcoming that isn't already on your board." sub="You're tracking well." />
+        <QuietState message="Everything upcoming is already on your board." sub="You're ahead of the curve." />
       ) : (
         laterItems.map((r) => {
           const win = resolveWindow(r, setup);
@@ -2337,11 +2346,11 @@ function GetAheadScreen({ rules, itemStates, ctx, onAction, queueState }) {
 
       {toobusy ? (
         <QuietState
-          message="The day is busy enough right now."
-          sub="Being present with patients matters more than checking boxes."
+          message="Plenty on your plate already."
+          sub="Being present with patients matters more right now."
         />
       ) : eligible.length === 0 ? (
-        <QuietState message="Nothing to get ahead on right now." sub="That's usually a good sign." />
+        <QuietState message="Nothing to get ahead on right now." sub="You're in a good spot." />
       ) : (
         eligible.map((r) => (
           <div key={r.id} style={{
@@ -2422,8 +2431,12 @@ function ExitScreen({ rules, itemStates, ctx, setup, onAction, vaccineCount }) {
 
       {unresolved.length === 0 ? (
         <QuietState
-          message={ctx.exitWindow ? "Nothing unresolved to hand off." : "Not in the exit window yet."}
-          sub={ctx.exitWindow ? "All set for today. Thanks for keeping patients and the team steady." : `About ${Math.round(ctx.minutesUntilEnd)} minutes until shift end.`}
+          message={ctx.exitWindow ? "Clean handoff. Nothing unresolved." : "Not in the exit window yet."}
+          sub={ctx.exitWindow
+            ? (covered.length > 0
+              ? `${covered.length} items covered today. Thanks for keeping patients and the team steady.`
+              : "All set for today. Thanks for keeping patients and the team steady.")
+            : `About ${Math.round(ctx.minutesUntilEnd)} minutes until shift end.`}
         />
       ) : (
         <>
@@ -2480,7 +2493,7 @@ function ExitScreen({ rules, itemStates, ctx, setup, onAction, vaccineCount }) {
         if (stillOpenExit.length === 0) return null;
         return (
           <>
-            <SectionLabel>Still open — window passed</SectionLabel>
+            <SectionLabel>Worth mentioning — window passed</SectionLabel>
             {stillOpenExit.map((r) => (
               <div key={r.id} style={{
                 background: MF.card, border: `1px solid ${MF.border}`,
@@ -2490,7 +2503,7 @@ function ExitScreen({ rules, itemStates, ctx, setup, onAction, vaccineCount }) {
                 <div style={{ fontSize: "14px", fontWeight: 600, marginBottom: "4px" }}>{r.label}</div>
                 <div style={{ display: "flex", gap: "6px", marginTop: "8px" }}>
                   <button style={btn(MF.green, MF.greenDim)} onClick={() => onAction(r.id, S.CONFIRMED)}>Already handled</button>
-                  <button style={btn(MF.textMuted, "rgba(139,148,158,0.08)")} onClick={() => onAction(r.id, S.NOT_APPLICABLE)}>Not needed</button>
+                  <button style={btn(MF.textMuted, "rgba(139,148,158,0.08)")} onClick={() => onAction(r.id, S.NOT_APPLICABLE)}>Skip</button>
                 </div>
               </div>
             ))}
