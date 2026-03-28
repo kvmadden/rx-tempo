@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, Component } from "react";
 
 // ─── RULE TABLE: Real pharmacy content with full behavior contracts ───
 const RULES = [
@@ -365,6 +365,7 @@ const RULES = [
 const pad = (n) => String(n).padStart(2, "0");
 const toMin = (h, m) => h * 60 + m;
 const fmtTime12 = (totalMin) => {
+  if (typeof totalMin !== "number" || !isFinite(totalMin)) return "--:--";
   const h = Math.floor(((totalMin % 1440) + 1440) % 1440 / 60);
   const m = ((totalMin % 1440) + 1440) % 1440 % 60;
   const ampm = h >= 12 ? "PM" : "AM";
@@ -942,12 +943,32 @@ function QuietState({ message, sub }) {
 function InfoPanel({ show, onClose }) {
   const [expanded, setExpanded] = useState(null);
   const toggle = (key) => setExpanded((prev) => prev === key ? null : key);
+  const panelRef = useRef(null);
+  const previousFocusRef = useRef(null);
 
   useEffect(() => {
     if (!show) return;
-    const handleKey = (e) => { if (e.key === "Escape") onClose(); };
+    previousFocusRef.current = document.activeElement;
+    const panel = panelRef.current;
+    if (panel) {
+      const firstFocusable = panel.querySelector("button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])");
+      if (firstFocusable) firstFocusable.focus();
+    }
+    const handleKey = (e) => {
+      if (e.key === "Escape") { onClose(); return; }
+      if (e.key !== "Tab" || !panel) return;
+      const focusable = panel.querySelectorAll("button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])");
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    };
     window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
+    return () => {
+      window.removeEventListener("keydown", handleKey);
+      if (previousFocusRef.current && previousFocusRef.current.focus) previousFocusRef.current.focus();
+    };
   }, [show, onClose]);
 
   if (!show) return null;
@@ -1067,7 +1088,7 @@ function InfoPanel({ show, onClose }) {
         background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)",
         animation: "fadeIn 0.2s ease",
       }} />
-      <div style={{
+      <div ref={panelRef} style={{
         position: "relative", width: "85%", maxWidth: "360px",
         background: MF.bg, borderLeft: `1px solid ${MF.border}`,
         overflowY: "auto", padding: "20px 16px",
@@ -2022,7 +2043,7 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
       })}
 
       {/* Status line — pacing + pressure + streak (hidden for minimal guidance) */}
-      {guidanceLevel !== "minimal" && <div style={{ fontSize: "13px", color: MF.text, fontWeight: 500, marginBottom: "8px", lineHeight: 1.4 }}>
+      {guidanceLevel !== "minimal" && <div role="status" aria-live="polite" aria-atomic="true" style={{ fontSize: "13px", color: MF.text, fontWeight: 500, marginBottom: "8px", lineHeight: 1.4 }}>
         {onAStreak ? "On a roll." : pacingLine}
         {queueState === "highdemand" && (
           <span style={{ color: MF.amber, marginLeft: "6px", fontSize: "12px", fontWeight: 400 }}>· Optional items hidden</span>
@@ -2502,8 +2523,8 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
         ].filter((e) => expected[e.key]);
 
         if (allEvents.length === 0) return null;
-        const pending = allEvents.filter((e) => !eventArrivals[e.key]);
-        const arrived = allEvents.filter((e) => eventArrivals[e.key]);
+        const pending = allEvents.filter((e) => !(eventArrivals[e.key] ?? 0));
+        const arrived = allEvents.filter((e) => !!(eventArrivals[e.key] ?? 0));
 
         if (pending.length === 0 && arrived.length === 0) return null;
         return (
@@ -2581,7 +2602,7 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
                 <span style={{ fontSize: "10px", color: MF.accent, fontWeight: 500 }}>Good time to think about this</span>
               )}
             </div>
-            <span style={{
+            <span aria-live="polite" aria-atomic="true" style={{
               fontSize: "12px", fontWeight: 600,
               color: vaccineCount >= setup.immTarget ? MF.green : MF.accent,
             }}>
@@ -3489,8 +3510,30 @@ function TimeSimulator({ simTime, onSimTimeChange, onClose, onReset, shiftStart,
   );
 }
 
+// ─── ERROR BOUNDARY ───
+class AppErrorBoundary extends Component {
+  constructor(props) { super(props); this.state = { hasError: false }; }
+  static getDerivedStateFromError() { return { hasError: true }; }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: "40px 20px", textAlign: "center", fontFamily: "'IBM Plex Sans', -apple-system, sans-serif" }}>
+          <div style={{ fontSize: "18px", fontWeight: 600, marginBottom: "12px" }}>Something went wrong</div>
+          <div style={{ fontSize: "14px", color: "#888", marginBottom: "20px" }}>RxTempo hit an unexpected error.</div>
+          <button
+            onClick={() => { this.setState({ hasError: false }); }}
+            style={{ padding: "10px 24px", fontSize: "14px", fontWeight: 600, cursor: "pointer",
+              border: "1px solid #444", borderRadius: "8px", background: "transparent", color: "#ccc" }}
+          >Try again</button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 // ─── MAIN APP ───
-export default function RxTempo() {
+function RxTempoApp() {
   const [setup, setSetup] = useState(null);
   const [screen, setScreen] = useState("landing");
   const [itemStates, setItemStates] = useState({});
@@ -4086,4 +4129,8 @@ export default function RxTempo() {
       </div>
     </div>
   );
+}
+
+export default function RxTempo() {
+  return <AppErrorBoundary><RxTempoApp /></AppErrorBoundary>;
 }
