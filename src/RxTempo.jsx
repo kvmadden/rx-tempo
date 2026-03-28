@@ -1138,7 +1138,7 @@ function StartDayScreen({ onComplete }) {
             ...(hasOV === "yes" ? [["OV delivery", "Expected today"]] : []),
             ...(hasUSPS === "yes" ? [["USPS pickup", "Expected today"]] : []),
             ...(+immTarget > 0 ? [["Immunizations", `Target: ${immTarget}`]] : []),
-            ["Guidance", guidance === "minimal" ? "Minimal" : guidance === "more" ? "More guidance" : "Balanced"],
+            ["Guidance", guidance === "minimal" ? "Minimal" : guidance === "full" ? "Full" : guidance === "more" ? "Supportive" : "Balanced"],
           ].map(([label, val], i, arr) => (
             <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "10px 0", borderBottom: i < arr.length - 1 ? `1px solid ${MF.border}` : "none" }}>
               <span style={{ fontSize: "13px", color: MF.textMuted }}>{label}</span>
@@ -1602,9 +1602,10 @@ function StartDayScreen({ onComplete }) {
             </div>
 
             <SelectField label="Guidance level" value={guidance} onChange={setGuidance} options={[
-              { value: "minimal", label: "Minimal — only time-sensitive" },
+              { value: "minimal", label: "Minimal — just the essentials" },
               { value: "balanced", label: "Balanced — recommended" },
-              { value: "more", label: "More guidance — gentle nudges" },
+              { value: "more", label: "Supportive — encouragement + nudges" },
+              { value: "full", label: "Full — contextual tips + shift summary" },
             ]} />
 
             {/* Notes — optional, up to 5 */}
@@ -1701,6 +1702,7 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
   const [showCovered, setShowCovered] = useState(false);
   const [showAllVisible, setShowAllVisible] = useState(false);
   const [justConfirmed, setJustConfirmed] = useState(null);
+  const [confirmTimestamps, setConfirmTimestamps] = useState([]);
 
   const WEIGHT_RANK = { high: 0, medium: 1, low: 2 };
   const MAX_SHOWN = 4;
@@ -1723,13 +1725,24 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
   const coveredCount = confirmed.length;
   const completionPct = totalActionable > 0 ? (coveredCount / totalActionable) * 100 : 0;
 
+  const isFirstConfirm = coveredCount === 0;
+  const guidanceLevel = setup.guidance || "balanced";
+  const showEncouragement = guidanceLevel === "more" || guidanceLevel === "full";
+  const showSummary = guidanceLevel === "full";
+
+  // Streak detection — 3+ confirms within 15 minutes
+  const recentConfirms = confirmTimestamps.filter((t) => Date.now() - t < 15 * 60 * 1000);
+  const onAStreak = showEncouragement && recentConfirms.length >= 3;
+
   const handleConfirm = (ruleId) => {
     setJustConfirmed(ruleId);
+    setConfirmTimestamps((prev) => [...prev, Date.now()]);
+    const flashDuration = isFirstConfirm ? 600 : 400;
     setTimeout(() => {
       onAction(ruleId, S.CONFIRMED);
       setExpandedItem(null);
       setJustConfirmed(null);
-    }, 400);
+    }, flashDuration);
   };
 
   // Items whose window has passed without being actioned
@@ -1853,9 +1866,9 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
         );
       })}
 
-      {/* Status line — pacing + pressure combined */}
+      {/* Status line — pacing + pressure + streak */}
       <div style={{ fontSize: "13px", color: MF.text, fontWeight: 500, marginBottom: "8px", lineHeight: 1.4 }}>
-        {pacingLine}
+        {onAStreak ? "On a roll." : pacingLine}
         {highPressure && (
           <span style={{ color: MF.amber, marginLeft: "6px", fontSize: "12px", fontWeight: 400 }}>
             {queueState === "highdemand" ? "· Optional items hidden" : "· Focus mode"}
@@ -1867,6 +1880,41 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
           </span>
         )}
       </div>
+
+      {/* Shift summary — appears in closing phase with full guidance */}
+      {showSummary && ctx.shiftProgress >= 0.85 && coveredCount > 0 && (() => {
+        const skipped = rules.filter((r) => itemStates[r.id] === S.NOT_APPLICABLE).length;
+        return (
+          <div style={{
+            display: "flex", gap: "12px", justifyContent: "space-around",
+            padding: "10px 0", marginBottom: "8px",
+            borderTop: `1px solid ${MF.border}`, borderBottom: `1px solid ${MF.border}`,
+          }}>
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontSize: "18px", fontWeight: 700, color: MF.green }}>{coveredCount}</div>
+              <div style={{ fontSize: "10px", color: MF.textMuted, textTransform: "uppercase", letterSpacing: "0.05em" }}>covered</div>
+            </div>
+            {visible.length > 0 && (
+              <div style={{ textAlign: "center" }}>
+                <div style={{ fontSize: "18px", fontWeight: 700, color: MF.accent }}>{visible.length}</div>
+                <div style={{ fontSize: "10px", color: MF.textMuted, textTransform: "uppercase", letterSpacing: "0.05em" }}>active</div>
+              </div>
+            )}
+            {skipped > 0 && (
+              <div style={{ textAlign: "center" }}>
+                <div style={{ fontSize: "18px", fontWeight: 700, color: MF.textMuted }}>{skipped}</div>
+                <div style={{ fontSize: "10px", color: MF.textMuted, textTransform: "uppercase", letterSpacing: "0.05em" }}>skipped</div>
+              </div>
+            )}
+            {vaccineCount > 0 && (
+              <div style={{ textAlign: "center" }}>
+                <div style={{ fontSize: "18px", fontWeight: 700, color: vaccineCount >= (setup.immTarget || 0) ? MF.green : MF.accent }}>{vaccineCount}</div>
+                <div style={{ fontSize: "10px", color: MF.textMuted, textTransform: "uppercase", letterSpacing: "0.05em" }}>vaccines</div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Visible items — compact rows with expand */}
       {visible.length > 0 && (() => {
@@ -1894,6 +1942,8 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
                 border: `1px solid ${isConfirming ? MF.green + "60" : isEscalated ? MF.amber + "4D" : MF.border}`,
                 borderLeft: `3px solid ${isConfirming ? MF.green : leftBorder}`,
                 transition: "all 0.3s ease",
+                transform: isConfirming ? "scale(0.98)" : "scale(1)",
+                opacity: isConfirming ? 0.85 : 1,
                 borderRadius: MF.radius,
                 overflow: "hidden",
                 animation: "slideUp 0.25s ease both",
@@ -1939,9 +1989,18 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
                 {/* Expanded detail */}
                 {isOpen && (
                   <div style={{ padding: "0 16px 14px", animation: "fadeIn 0.15s ease" }}>
-                    <div style={{ fontSize: "13px", color: MF.textMuted, lineHeight: 1.6, marginBottom: "12px" }}>
+                    <div style={{ fontSize: "13px", color: MF.textMuted, lineHeight: 1.6, marginBottom: showEncouragement ? "6px" : "12px" }}>
                       {r.description}
                     </div>
+                    {showEncouragement && (() => {
+                      const tip = r.riskWeight === "low" && ctx.timingPressure !== "tightening" ? "Quick one." :
+                        r.riskWeight === "high" && ctx.timingPressure === "tightening" ? "Worth prioritizing." :
+                        ctx.timingPressure === "early" && r.riskWeight !== "high" ? "Good one to knock out early." :
+                        coveredCount > 0 && visible.length <= 2 ? "Almost there." :
+                        null;
+                      if (!tip) return null;
+                      return <div style={{ fontSize: "11px", color: MF.accent, marginBottom: "10px", fontStyle: "italic" }}>{tip}</div>;
+                    })()}
                     {isEscalated && (
                       <span style={{ ...badge(MF.amber, MF.amberDim), display: "inline-block", marginBottom: "10px" }}>
                         Entering a tighter window
