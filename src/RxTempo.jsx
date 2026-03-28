@@ -438,15 +438,16 @@ function computeItemStates(rules, prevStates, setup, ctx, queueState) {
   const q = queueState || "ontrack";
   const highPressure = prevActive > 5 || ctx.timingPressure === "end-of-day" || q === "highdemand";
   const needsFocus = q === "needsfocus" || q === "highdemand";
+  const queuesClear = q === "clear";
 
   // ShiftType filtering: suppress categories that don't match the shift posture
   const shiftType = setup.shiftType || "open-close";
   const suppressOpening = shiftType === "mid" || shiftType === "mid-close" || shiftType === "overnight";
   const suppressDeadline = shiftType === "open-mid";
 
-  // Track how many items we're making visible (hard cap for Scenario 3)
+  // Dynamic cap based on queue state
   let visibleCount = 0;
-  const MAX_VISIBLE = 7;
+  const MAX_VISIBLE = needsFocus ? 5 : queuesClear ? 10 : 7;
 
   for (const rule of rules) {
     const prev = prevStates[rule.id];
@@ -477,13 +478,22 @@ function computeItemStates(rules, prevStates, setup, ctx, queueState) {
     const inWin = isTimeInRange(ctx.currentMin, win.start, win.end);
 
     // Get Ahead: suppress under pressure or when queues need focus
-    if (rule.category === "getahead" && (highPressure || needsFocus)) {
-      result[rule.id] = S.HIDDEN;
-      continue;
+    // but PROMOTE when queues are clear (show even if not in window yet)
+    if (rule.category === "getahead") {
+      if (highPressure || needsFocus) {
+        result[rule.id] = S.HIDDEN;
+        continue;
+      }
     }
 
     // High demand: suppress low-risk items entirely
     if (q === "highdemand" && rule.riskWeight === "low") {
+      result[rule.id] = S.HIDDEN;
+      continue;
+    }
+
+    // Needs focus: suppress low-risk items that aren't already visible
+    if (q === "needsfocus" && rule.riskWeight === "low" && prev !== S.VISIBLE && prev !== S.VISIBLE_HANDOFF) {
       result[rule.id] = S.HIDDEN;
       continue;
     }
@@ -1645,7 +1655,6 @@ function StartDayScreen({ onComplete }) {
 
 // HOME
 function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArrivals, onEventArrival, queueState, onQueueState, vaccineCount, onVaccine, dayNoteStates, onDayNoteState, dayNoteConfirm, onDayNoteConfirm }) {
-  const [queueExpanded, setQueueExpanded] = useState(false);
   const [immExpanded, setImmExpanded] = useState(false);
   const [expandedItem, setExpandedItem] = useState(null);
   const [showStillOpen, setShowStillOpen] = useState(false);
@@ -1720,7 +1729,7 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
 
   const pacingLine = getPacingLine(ctx, visible.length, ctx.coverageMode, queueState, coveredCount, totalActionable);
   const phaseLabel = getPhaseLabel(ctx);
-  const highPressure = visible.length > 5 || queueState === "highdemand";
+  const highPressure = visible.length > 5 || queueState === "highdemand" || queueState === "needsfocus";
 
   return (
     <div style={{ padding: "12px 16px", animation: "fadeIn 0.2s ease" }}>
@@ -1831,15 +1840,14 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
       {/* Status line — pacing + pressure + streak */}
       <div style={{ fontSize: "13px", color: MF.text, fontWeight: 500, marginBottom: "8px", lineHeight: 1.4 }}>
         {onAStreak ? "On a roll." : pacingLine}
-        {highPressure && (
-          <span style={{ color: MF.amber, marginLeft: "6px", fontSize: "12px", fontWeight: 400 }}>
-            {queueState === "highdemand" ? "· Optional items hidden" : "· Focus mode"}
-          </span>
+        {queueState === "highdemand" && (
+          <span style={{ color: MF.amber, marginLeft: "6px", fontSize: "12px", fontWeight: 400 }}>· Optional items hidden</span>
         )}
-        {queueState === "needsfocus" && !highPressure && (
-          <span style={{ color: MF.secondary, marginLeft: "6px", fontSize: "12px", fontWeight: 400 }}>
-            · Queues need focus
-          </span>
+        {queueState === "needsfocus" && (
+          <span style={{ color: MF.amber, marginLeft: "6px", fontSize: "12px", fontWeight: 400 }}>· Low-priority items hidden</span>
+        )}
+        {queueState === "clear" && visible.length === 0 && coveredCount > 0 && (
+          <span style={{ color: MF.green, marginLeft: "6px", fontSize: "12px", fontWeight: 400 }}>· Check Ahead tab</span>
         )}
       </div>
 
@@ -2195,18 +2203,28 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
       })()}
 
       {/* ── Immunization tracker ── */}
-      {setup.immTarget > 0 && onVaccine && (
+      {setup.immTarget > 0 && onVaccine && (() => {
+        // Auto-expand when queues are clear and target not yet met
+        const autoExpand = queueState === "clear" && vaccineCount < setup.immTarget;
+        const isExpanded = immExpanded || autoExpand;
+        return (
         <div style={{ marginTop: "8px" }}>
           <button
             onClick={() => setImmExpanded(!immExpanded)}
             style={{
               width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center",
-              padding: "12px 16px", background: MF.card, border: `1px solid ${MF.border}`,
-              borderRadius: immExpanded ? `${MF.radiusSm} ${MF.radiusSm} 0 0` : MF.radiusSm,
+              padding: "12px 16px", background: MF.card,
+              border: `1px solid ${autoExpand && !immExpanded ? MF.accent + "40" : MF.border}`,
+              borderRadius: isExpanded ? `${MF.radiusSm} ${MF.radiusSm} 0 0` : MF.radiusSm,
               cursor: "pointer", fontFamily: MF.font,
             }}
           >
-            <span style={{ fontSize: "13px", fontWeight: 600, color: MF.text }}>Immunizations</span>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <span style={{ fontSize: "13px", fontWeight: 600, color: MF.text }}>Immunizations</span>
+              {autoExpand && !immExpanded && (
+                <span style={{ fontSize: "10px", color: MF.accent, fontWeight: 500 }}>Good time to think about this</span>
+              )}
+            </div>
             <span style={{
               fontSize: "12px", fontWeight: 600,
               color: vaccineCount >= setup.immTarget ? MF.green : MF.accent,
@@ -2214,9 +2232,9 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
               {vaccineCount} / {setup.immTarget}
             </span>
           </button>
-          {immExpanded && (
+          {isExpanded && (
             <div style={{
-              padding: "12px 16px", background: MF.card, border: `1px solid ${MF.border}`, borderTop: "none",
+              padding: "12px 16px", background: MF.card, border: `1px solid ${autoExpand && !immExpanded ? MF.accent + "40" : MF.border}`, borderTop: "none",
               borderRadius: `0 0 ${MF.radiusSm} ${MF.radiusSm}`,
             }}>
               {/* Progress bar */}
@@ -2229,6 +2247,7 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
               </div>
               <div style={{ fontSize: "12px", color: MF.textMuted, marginBottom: "12px", fontStyle: "italic" }}>
                 {vaccineCount >= setup.immTarget ? "Target met. Well done." :
+                 queueState === "clear" && vaccineCount === 0 ? "Calm moment — good time for a conversation." :
                  vaccineCount > 0 ? "Keep it up — every conversation matters." :
                  "Each one protects someone. You've got this."}
               </div>
@@ -2258,7 +2277,8 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
             </div>
           )}
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
