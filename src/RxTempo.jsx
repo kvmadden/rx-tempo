@@ -426,6 +426,7 @@ const AUTO_EXPIRE_MS = 24 * 60 * 60 * 1000; // 24 hours
 const TICK_INTERVAL_MS = 30000; // 30 seconds
 const WEIGHT_RANK = { high: 0, medium: 1, low: 2 };
 const TYPE_RANK = { compliance: 0, task: 1, check: 2 };
+const haptic = (ms = 50) => { if (navigator.vibrate) navigator.vibrate(ms); };
 
 function deriveContext(setup, now) {
   if (!setup) return null;
@@ -1915,6 +1916,7 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
 
   const handleConfirm = (ruleId) => {
     if (confirmTimerRef.current) clearTimeout(confirmTimerRef.current);
+    haptic();
     setJustConfirmed(ruleId);
     const now = Date.now();
     setConfirmTimestamps((prev) => [...prev.filter((t) => now - t < STREAK_WINDOW_MS), now]);
@@ -2758,6 +2760,7 @@ function ArrivalScreen({ rules, itemStates, ctx, onAction, setup }) {
   useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
   const handleConfirm = (ruleId, state) => {
     if (timerRef.current) clearTimeout(timerRef.current);
+    haptic();
     setJustConfirmed(ruleId);
     timerRef.current = setTimeout(() => { onAction(ruleId, state); setExpandedItem(null); setJustConfirmed(null); timerRef.current = null; }, CONFIRM_FLASH_MS);
   };
@@ -2921,6 +2924,7 @@ function LaterTodayScreen({ rules, itemStates, setup, ctx, onAction }) {
   useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
   const handleConfirm = (ruleId, state) => {
     if (timerRef.current) clearTimeout(timerRef.current);
+    haptic();
     setJustConfirmed(ruleId);
     timerRef.current = setTimeout(() => { onAction(ruleId, state); setExpandedItem(null); setJustConfirmed(null); timerRef.current = null; }, CONFIRM_FLASH_MS);
   };
@@ -3057,6 +3061,7 @@ function GetAheadScreen({ rules, itemStates, ctx, onAction, queueState }) {
   useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
   const handleConfirm = (ruleId, state) => {
     if (timerRef.current) clearTimeout(timerRef.current);
+    haptic();
     setJustConfirmed(ruleId);
     timerRef.current = setTimeout(() => { onAction(ruleId, state); setExpandedItem(null); setJustConfirmed(null); timerRef.current = null; }, CONFIRM_FLASH_MS);
   };
@@ -3165,6 +3170,7 @@ function ExitScreen({ rules, itemStates, ctx, setup, onAction, vaccineCount }) {
   useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
   const handleConfirm = (ruleId, state) => {
     if (timerRef.current) clearTimeout(timerRef.current);
+    haptic();
     setJustConfirmed(ruleId);
     timerRef.current = setTimeout(() => { onAction(ruleId, state); setExpandedItem(null); setJustConfirmed(null); timerRef.current = null; }, CONFIRM_FLASH_MS);
   };
@@ -3552,6 +3558,7 @@ function RxTempoApp() {
   const [checkConfirmedAt, setCheckConfirmedAt] = useState({}); // { ruleId: queueState } — tracks pressure level when each check was confirmed
   const [dayNoteStates, setDayNoteStates] = useState({}); // { 0: "active"|"happened"|"dismissed", 1: ... }
   const [dayNoteConfirm, setDayNoteConfirm] = useState(null); // index of note showing dismiss confirm
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   // Update MF on every render based on current theme
   MF = { ...THEMES[theme], font: "'IBM Plex Sans', -apple-system, sans-serif", radius: "12px", radiusSm: "8px" };
@@ -3583,6 +3590,7 @@ function RxTempoApp() {
     setVaccineCount(0);
     setDayNoteStates({});
     setDayNoteConfirm(null);
+    setShowResetConfirm(false);
     setScreen("landing");
     setSimMode(false);
     setSimTime(null);
@@ -3983,9 +3991,10 @@ function RxTempoApp() {
   // If ctx isn't ready yet, show loading
   if (!ctx || !setup) {
     return (
-      <div style={{ fontFamily: MF.font, background: MF.bg, color: MF.text, minHeight: "100vh", maxWidth: "430px", margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <style>{globalCSS}</style>
-        <span style={{ color: MF.textMuted }}>Loading...</span>
+      <div style={{ fontFamily: MF.font, background: MF.bg, color: MF.text, minHeight: "100vh", maxWidth: "430px", margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: "12px" }}>
+        <style>{globalCSS}{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        <div style={{ width: "24px", height: "24px", border: `2px solid ${MF.border}`, borderTop: `2px solid ${MF.accent}`, borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+        <span style={{ color: MF.textMuted, fontSize: "13px" }}>Loading...</span>
       </div>
     );
   }
@@ -4048,7 +4057,7 @@ function RxTempoApp() {
           </button>
           <button
             aria-label="Reset shift"
-            onClick={handleReset}
+            onClick={() => setShowResetConfirm(true)}
             style={{
               background: "none", border: `1px solid ${MF.border}`, borderRadius: "6px",
               padding: "4px", cursor: "pointer", color: MF.danger,
@@ -4061,6 +4070,49 @@ function RxTempoApp() {
       </div>
 
       <InfoPanel show={showInfo} onClose={() => setShowInfo(false)} />
+
+      {/* ── RESET CONFIRMATION ── */}
+      {showResetConfirm && (
+        <div role="dialog" aria-modal="true" aria-label="Confirm reset" style={{
+          position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 200,
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          <div onClick={() => setShowResetConfirm(false)} aria-hidden="true" style={{
+            position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
+            background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)",
+          }} />
+          <div style={{
+            position: "relative", width: "85%", maxWidth: "320px",
+            background: MF.card, borderRadius: MF.radius, padding: "24px",
+            border: `1px solid ${MF.border}`, textAlign: "center",
+          }}>
+            <div style={{ fontSize: "15px", fontWeight: 600, color: MF.text, marginBottom: "8px" }}>
+              Reset this shift?
+            </div>
+            <div style={{ fontSize: "13px", color: MF.textMuted, marginBottom: "20px", lineHeight: 1.4 }}>
+              All progress will be cleared. This can't be undone.
+            </div>
+            <div style={{ display: "flex", gap: "8px" }}>
+              <button
+                onClick={() => setShowResetConfirm(false)}
+                style={{
+                  flex: 1, padding: "10px", fontSize: "13px", fontWeight: 600,
+                  fontFamily: MF.font, cursor: "pointer", borderRadius: MF.radiusSm,
+                  border: `1px solid ${MF.border}`, background: "transparent", color: MF.text,
+                }}
+              >Cancel</button>
+              <button
+                onClick={() => { setShowResetConfirm(false); handleReset(); }}
+                style={{
+                  flex: 1, padding: "10px", fontSize: "13px", fontWeight: 600,
+                  fontFamily: MF.font, cursor: "pointer", borderRadius: MF.radiusSm,
+                  border: "none", background: MF.danger, color: "#fff",
+                }}
+              >Reset</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── SIMULATOR ── */}
       {simMode && setup && (
