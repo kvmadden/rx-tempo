@@ -2382,6 +2382,7 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
           if ([S.VISIBLE, S.VISIBLE_HANDOFF, S.NEEDS_ATTENTION].includes(itemStates[r.id])) return false;
           if (itemStates[r.id] !== S.HIDDEN) return false;
           const win = resolveWindow(r, setup);
+          if (win.start >= win.end) return ctx.currentMin < win.start && ctx.currentMin > win.end;
           return win.start > ctx.currentMin;
         }).length : 0;
         const skipped = rules.filter((r) => itemStates[r.id] === S.NOT_APPLICABLE).length;
@@ -3555,6 +3556,8 @@ function RxTempoApp() {
   const [dayNoteStates, setDayNoteStates] = useState({}); // { 0: "active"|"happened"|"dismissed", 1: ... }
   const [dayNoteConfirm, setDayNoteConfirm] = useState(null); // index of note showing dismiss confirm
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const queueStateRef = useRef(queueState);
+  useEffect(() => { queueStateRef.current = queueState; }, [queueState]);
 
   // Update MF on every render based on current theme
   MF = { ...THEMES[theme], font: "'IBM Plex Sans', -apple-system, sans-serif", radius: "12px", radiusSm: "8px" };
@@ -3606,6 +3609,17 @@ function RxTempoApp() {
       handleReset();
     }
   }, [now, setup, handleReset]);
+
+  // Also check auto-expire when tab becomes visible (intervals throttled while backgrounded)
+  useEffect(() => {
+    const check = () => {
+      if (document.visibilityState === "visible" && setup && Date.now() - setup.setupTimestamp > AUTO_EXPIRE_MS) {
+        handleReset();
+      }
+    };
+    document.addEventListener("visibilitychange", check);
+    return () => document.removeEventListener("visibilitychange", check);
+  }, [setup, handleReset]);
 
   const ctx = useMemo(() => deriveContext(setup, effectiveNow), [setup, effectiveNow]);
 
@@ -3701,10 +3715,10 @@ function RxTempoApp() {
     if (newState === S.CONFIRMED || newState === S.HANDLED_EARLY) {
       const rule = activeRules.find((r) => r.id === ruleId);
       if (rule && isCheckItem(rule)) {
-        setCheckConfirmedAt((prev) => ({ ...prev, [ruleId]: queueState }));
+        setCheckConfirmedAt((prev) => ({ ...prev, [ruleId]: queueStateRef.current }));
       }
     }
-  }, [activeRules, queueState]);
+  }, [activeRules]);
 
   // Auto-return: after acting on arrival/exit items, return to Home after a beat
   const actionReturnRef = useRef(null);
