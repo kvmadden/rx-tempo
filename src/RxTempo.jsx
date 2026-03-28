@@ -1028,41 +1028,39 @@ function StartDayScreen({ onComplete }) {
           Quick check before we go.
         </p>
 
-        <div style={{ background: MF.card, border: `1px solid ${MF.border}`, borderRadius: MF.radius, padding: "16px", marginBottom: "16px" }}>
-          {[
+        {(() => {
+          const couriers = [
+            ...(hasOV === "yes" ? ["Outside vendor (OV)"] : []),
+            ...(hasUSPS === "yes" ? ["Postal service"] : []),
+          ];
+          const events = [
+            ...(hasWarehouse === "yes" ? ["Warehouse delivery"] : []),
+          ];
+          const trimmedNotes = dayNotes.filter((n) => n.trim());
+          const rows = [
             ["Role", ROLE_LABELS[role]],
             ["Shift type", SHIFT_TYPE_LABELS[shiftType]],
             ["Your shift", `${fmtTime12(+shiftStart)} — ${fmtTime12(+shiftEnd)}`],
             ["Pharmacy", is24hrToggle ? "24 hours" : `${fmtTime12(+storeOpen)} — ${fmtTime12(+storeClose)}`],
             ["Coverage", hasOverlap === "yes" ? overlapWindows.map((w, i) => `${fmtTime12(+w.start)} — ${fmtTime12(+w.end)}`).join(", ") : "Solo today"],
-            ...(hasWarehouse === "yes" ? [["Warehouse", "Expected today"]] : []),
-            ...(hasOV === "yes" ? [["OV delivery", "Expected today"]] : []),
-            ...(hasUSPS === "yes" ? [["USPS pickup", "Expected today"]] : []),
-            ...(+immTarget > 0 ? [["Immunizations", `Target: ${immTarget}`]] : []),
-            ["Guidance", guidance === "minimal" ? "Minimal" : guidance === "full" ? "Full" : guidance === "more" ? "Supportive" : "Balanced"],
-          ].map(([label, val], i, arr) => (
-            <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "10px 0", borderBottom: i < arr.length - 1 ? `1px solid ${MF.border}` : "none" }}>
-              <span style={{ fontSize: "13px", color: MF.textMuted }}>{label}</span>
-              <span style={{ fontSize: "13px", fontWeight: 600 }}>{val}</span>
-            </div>
-          ))}
-        </div>
+            ...(couriers.length > 0 ? [["Routine couriers", couriers.join(", ")]] : []),
+            ...(events.length > 0 ? [["Events", events.join(", ")]] : []),
+            ...(+immTarget > 0 ? [["Immunization target", immTarget]] : []),
+            ["Guidance preference", guidance === "minimal" ? "Minimal" : guidance === "full" ? "Full" : guidance === "more" ? "Supportive" : "Balanced"],
+            ...(trimmedNotes.length > 0 ? [["Notes", trimmedNotes.join(" · ")]] : []),
+          ];
 
-        {dayNotes.filter((n) => n.trim()).length > 0 && (
-          <div style={{
-            background: MF.card, border: `1px solid ${MF.border}`, borderRadius: MF.radius,
-            padding: "14px 16px", marginBottom: "16px",
-          }}>
-            <div style={{ fontSize: "12px", fontWeight: 600, color: MF.textMuted, marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-              {dayNotes.filter((n) => n.trim()).length === 1 ? "Note" : "Notes"}
+          return (
+            <div style={{ background: MF.card, border: `1px solid ${MF.border}`, borderRadius: MF.radius, padding: "16px", marginBottom: "16px" }}>
+              {rows.map(([label, val], i) => (
+                <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "10px 0", borderBottom: i < rows.length - 1 ? `1px solid ${MF.border}` : "none", gap: "12px" }}>
+                  <span style={{ fontSize: "13px", color: MF.textMuted, flexShrink: 0 }}>{label}</span>
+                  <span style={{ fontSize: "13px", fontWeight: 600, textAlign: "right" }}>{val}</span>
+                </div>
+              ))}
             </div>
-            {dayNotes.filter((n) => n.trim()).map((n, i) => (
-              <div key={i} style={{ fontSize: "14px", color: MF.text, lineHeight: 1.5, marginBottom: i < dayNotes.filter((n) => n.trim()).length - 1 ? "4px" : 0 }}>
-                {n.trim()}
-              </div>
-            ))}
-          </div>
-        )}
+          );
+        })()}
 
         <button
           style={{ background: MF.gradient, color: "#fff", border: "none", borderRadius: MF.radiusSm, padding: "14px 24px", fontSize: "15px", fontWeight: 600, fontFamily: MF.font, cursor: "pointer", width: "100%", letterSpacing: "-0.01em", marginBottom: "10px" }}
@@ -1359,23 +1357,23 @@ function StartDayScreen({ onComplete }) {
               </div>
               <SelectField label="" value={hasOV} onChange={(val) => {
                 if (val === "no" && ovExpected) {
-                  setConfirmToggle({ key: "ov", label: "OV order delivery" });
+                  setConfirmToggle({ key: "ov", label: "Outside vendor (OV)" });
                 } else {
                   setHasOV(val);
                 }
               }} style={{ marginBottom: "8px" }} options={[
-                { value: "no", label: "OV order delivery — No" },
-                { value: "yes", label: "OV order delivery — Yes" },
+                { value: "no", label: "Outside vendor (OV) — No" },
+                { value: "yes", label: "Outside vendor (OV) — Yes" },
               ]} />
               <SelectField label="" value={hasUSPS} onChange={(val) => {
                 if (val === "no" && uspsExpected) {
-                  setConfirmToggle({ key: "usps", label: "USPS pickup" });
+                  setConfirmToggle({ key: "usps", label: "Postal service" });
                 } else {
                   setHasUSPS(val);
                 }
               }} style={{ marginBottom: "0" }} options={[
-                { value: "no", label: "USPS pickup — No" },
-                { value: "yes", label: "USPS pickup — Yes" },
+                { value: "no", label: "Postal service — No" },
+                { value: "yes", label: "Postal service — Yes" },
               ]} />
             </div>
 
@@ -1412,15 +1410,34 @@ function StartDayScreen({ onComplete }) {
               </div>
             )}
 
-            {/* Store events — manual */}
+            {/* Warehouse delivery — toggle */}
             <div style={{ marginBottom: "20px" }}>
               <label style={{ fontSize: "12px", fontWeight: 600, color: MF.textMuted, marginBottom: "10px", display: "block", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                Store events <span style={{ opacity: 0.5, fontWeight: 400, textTransform: "none" }}>(if applicable)</span>
+                Warehouse delivery
               </label>
-              <SelectField label="" value={hasWarehouse} onChange={setHasWarehouse} style={{ marginBottom: "0" }} options={[
-                { value: "no", label: "Warehouse delivery — No" },
-                { value: "yes", label: "Warehouse delivery — Yes" },
-              ]} />
+              <button
+                onClick={() => setHasWarehouse(hasWarehouse === "yes" ? "no" : "yes")}
+                style={{
+                  width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+                  padding: "12px 14px", borderRadius: MF.radiusSm,
+                  border: `1px solid ${hasWarehouse === "yes" ? MF.accent : MF.border}`,
+                  background: hasWarehouse === "yes" ? MF.accentDim : MF.card,
+                  cursor: "pointer", fontFamily: MF.font,
+                }}
+              >
+                <span style={{ fontSize: "15px", fontWeight: 500, color: MF.text }}>
+                  {hasWarehouse === "yes" ? "Expected today" : "Not expected"}
+                </span>
+                <span style={{
+                  fontSize: "12px", fontWeight: 700,
+                  color: hasWarehouse === "yes" ? MF.accent : MF.textMuted,
+                  padding: "2px 10px", borderRadius: "4px",
+                  border: `1px solid ${hasWarehouse === "yes" ? MF.accent : MF.border}`,
+                  background: hasWarehouse === "yes" ? MF.accentDim : "transparent",
+                }}>
+                  {hasWarehouse === "yes" ? "YES" : "NO"}
+                </span>
+              </button>
             </div>
             <div style={{ display: "flex", gap: "10px" }}>
               <button
@@ -2084,8 +2101,8 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
         const expected = setup.expectedEvents;
         const allEvents = [
           { key: "warehouse", label: "Warehouse delivery" },
-          { key: "ov", label: "OV order delivery" },
-          { key: "usps", label: "USPS pickup" },
+          { key: "ov", label: "Outside vendor (OV)" },
+          { key: "usps", label: "Postal service" },
         ].filter((e) => expected[e.key]);
 
         if (allEvents.length === 0) return null;
