@@ -3567,6 +3567,14 @@ function RxTempoApp() {
   // Reset scroll position when switching screens
   useEffect(() => { window.scrollTo(0, 0); }, [screen]);
 
+  // Escape key closes reset confirmation
+  useEffect(() => {
+    if (!showResetConfirm) return;
+    const h = (e) => { if (e.key === "Escape") setShowResetConfirm(false); };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [showResetConfirm]);
+
   // Tick every 30s (real time)
   useEffect(() => {
     const iv = setInterval(() => setNow(new Date()), TICK_INTERVAL_MS);
@@ -3783,7 +3791,7 @@ function RxTempoApp() {
                 }}>
                   {I.info}
                 </button>
-                <button onClick={() => setScreen("landing")} style={{
+                <button aria-label="Back to start" onClick={() => setScreen("landing")} style={{
                   background: "none", border: `1px solid ${MF.border}`, borderRadius: "6px",
                   color: MF.textMuted, fontSize: "12px", fontFamily: MF.font, padding: "5px 12px",
                   cursor: "pointer",
