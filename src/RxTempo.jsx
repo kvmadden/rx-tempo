@@ -60,7 +60,7 @@ const RULES = [
     label: "Refrigerator temperature log",
     description: "An out-of-range fridge can mean thousands in lost vaccine and insulin inventory. A 30-second check protects product and keeps you compliant.",
     category: "opening",
-    itemType: "check",
+    itemType: "compliance",
     usualWindow: { startOffset: 0, endOffset: 45 },
     roleContext: "Protects high-value inventory.",
     carryLogic: "carry",
@@ -153,7 +153,7 @@ const RULES = [
     label: "Controlled substance reconciliation",
     description: "This is a compliance requirement, but it also protects you and your team. A clean count today means no surprises at audit time.",
     category: "deadline",
-    itemType: "task",
+    itemType: "compliance",
     usualWindow: { startOffset: -90, endOffset: -15 },
     roleContext: "Protects the team at audit time.",
     carryLogic: "carry",
@@ -514,6 +514,10 @@ function computeItemStates(rules, prevStates, setup, ctx, queueState) {
       continue;
     }
 
+    // Compliance items are never suppressed by queue state
+    if (rule.itemType === "compliance") {
+      // fall through to normal window logic
+    } else
     // Needs focus: suppress low-risk items that aren't already visible
     if (q === "needsfocus" && rule.riskWeight === "low" && prev !== S.VISIBLE && prev !== S.VISIBLE_HANDOFF) {
       result[rule.id] = S.HIDDEN;
@@ -527,8 +531,8 @@ function computeItemStates(rules, prevStates, setup, ctx, queueState) {
     }
 
     if (inWin) {
-      // Hard cap: don't surface more than MAX_VISIBLE items
-      if (visibleCount >= MAX_VISIBLE && rule.riskWeight === "low") {
+      // Hard cap: don't surface more than MAX_VISIBLE items (compliance exempt)
+      if (visibleCount >= MAX_VISIBLE && rule.riskWeight === "low" && rule.itemType !== "compliance") {
         result[rule.id] = S.HIDDEN;
         continue;
       }
@@ -638,6 +642,8 @@ const THEMES = {
     greenDim: "rgba(63,185,80,0.12)",
     amber: "#D29922",
     amberDim: "rgba(210,153,34,0.12)",
+    compliance: "#C9727E",
+    complianceDim: "rgba(201,114,126,0.12)",
     gradient: "linear-gradient(135deg, #4A9EFF 0%, #3A7FCC 100%)",
     topBarBg: "rgba(15,17,20,0.95)",
     navBg: "rgba(15,17,20,0.95)",
@@ -659,6 +665,8 @@ const THEMES = {
     greenDim: "rgba(45,164,78,0.1)",
     amber: "#BF8700",
     amberDim: "rgba(191,135,0,0.1)",
+    compliance: "#A8505C",
+    complianceDim: "rgba(168,80,92,0.1)",
     gradient: "linear-gradient(135deg, #2D7ABF 0%, #24629A 100%)",
     topBarBg: "rgba(238,238,242,0.95)",
     navBg: "rgba(238,238,242,0.95)",
@@ -1690,6 +1698,7 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
   const [showAllVisible, setShowAllVisible] = useState(false);
   const [justConfirmed, setJustConfirmed] = useState(null);
   const [confirmTimestamps, setConfirmTimestamps] = useState([]);
+  const [confirmSkipCompliance, setConfirmSkipCompliance] = useState(null); // ruleId being skip-confirmed
 
   const WEIGHT_RANK = { high: 0, medium: 1, low: 2 };
   const MAX_SHOWN = 4;
@@ -1755,7 +1764,7 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
     return ctx.currentMin > win.end && ctx.currentMin < win.start;
   });
 
-  const visibleTasks = visible.filter((r) => (r.itemType || "task") === "task").length;
+  const visibleTasks = visible.filter((r) => { const t = r.itemType || "task"; return t === "task" || t === "compliance"; }).length;
   const visibleChecks = visible.filter((r) => (r.itemType || "task") === "check").length;
   const pacingLine = getPacingLine(ctx, visible.length, ctx.coverageMode, queueState, coveredCount, totalActionable, visibleTasks, visibleChecks);
   const phaseLabel = getPhaseLabel(ctx);
@@ -1981,6 +1990,109 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
               );
             }
 
+            // ── COMPLIANCE ROW: required items, friction on skip ──
+            const isCompliance = (r.itemType || "task") === "compliance";
+            if (isCompliance) {
+              const isOpen = expandedItem === r.id;
+              const isSkipConfirming = confirmSkipCompliance === r.id;
+              return (
+                <div key={r.id} style={{
+                  background: isConfirming ? MF.greenDim : MF.card,
+                  border: `1px solid ${isConfirming ? MF.green + "60" : MF.compliance + "40"}`,
+                  borderLeft: `3px solid ${isConfirming ? MF.green : MF.compliance}`,
+                  transition: "all 0.3s ease",
+                  transform: isConfirming ? "scale(0.98)" : "scale(1)",
+                  opacity: isConfirming ? 0.85 : 1,
+                  borderRadius: MF.radius,
+                  overflow: "hidden",
+                  animation: "slideUp 0.25s ease both",
+                }}>
+                  <button
+                    onClick={() => setExpandedItem(isOpen ? null : r.id)}
+                    style={{
+                      width: "100%", display: "flex", alignItems: "center", gap: "8px",
+                      padding: "10px 12px", background: "none", border: "none",
+                      cursor: "pointer", fontFamily: MF.font, textAlign: "left",
+                    }}
+                  >
+                    <div style={{
+                      width: "8px", height: "8px", borderRadius: "2px", flexShrink: 0,
+                      background: isConfirming ? MF.green : MF.compliance,
+                      transition: "background 0.2s ease",
+                    }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{
+                        fontSize: "14px", fontWeight: 600, letterSpacing: "-0.01em",
+                        color: isConfirming ? MF.green : MF.text,
+                        transition: "color 0.2s ease",
+                      }}>
+                        {isConfirming ? "Done" : r.label}
+                      </div>
+                      {!isConfirming && (
+                        <div style={{ fontSize: "11px", color: MF.compliance, marginTop: "1px", lineHeight: 1.3, fontWeight: 500 }}>
+                          Required — {r.roleContext.charAt(0).toLowerCase() + r.roleContext.slice(1)}
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
+                      <span style={{
+                        fontSize: "9px", fontWeight: 700, letterSpacing: "0.05em",
+                        color: MF.compliance, padding: "2px 6px", borderRadius: "4px",
+                        border: `1px solid ${MF.compliance}40`, background: MF.complianceDim,
+                      }}>REQ</span>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={MF.textMuted} strokeWidth="2" strokeLinecap="round" style={{
+                        transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
+                        transition: "transform 0.2s ease", opacity: 0.4,
+                      }}><polyline points="6 9 12 15 18 9"/></svg>
+                    </div>
+                  </button>
+                  {isOpen && (
+                    <div style={{ padding: "0 16px 14px", animation: "fadeIn 0.15s ease" }}>
+                      <div style={{ fontSize: "13px", color: MF.textMuted, lineHeight: 1.6, marginBottom: "12px" }}>
+                        {r.description}
+                      </div>
+                      {isSkipConfirming ? (
+                        <div style={{
+                          background: MF.complianceDim, border: `1px solid ${MF.compliance}30`,
+                          borderRadius: MF.radiusSm, padding: "10px 14px", marginBottom: "8px",
+                        }}>
+                          <div style={{ fontSize: "12px", fontWeight: 600, color: MF.compliance, marginBottom: "8px" }}>
+                            This is a compliance requirement. Are you sure?
+                          </div>
+                          <div style={{ display: "flex", gap: "6px" }}>
+                            <button
+                              style={btn(MF.compliance, MF.complianceDim)}
+                              onClick={() => { onAction(r.id, S.NOT_APPLICABLE); setExpandedItem(null); setConfirmSkipCompliance(null); }}
+                            >
+                              Yes, skip today
+                            </button>
+                            <button
+                              style={btn(MF.textMuted, "rgba(139,148,158,0.08)")}
+                              onClick={() => setConfirmSkipCompliance(null)}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                          <button style={btn(MF.green, MF.greenDim)} onClick={() => handleConfirm(r.id)}>
+                            Looks done
+                          </button>
+                          <button style={btn(MF.amber, MF.amberDim)} onClick={() => { onAction(r.id, S.NEEDS_ATTENTION); setExpandedItem(null); }}>
+                            Still needs attention
+                          </button>
+                          <button style={btn(MF.textMuted, "rgba(139,148,158,0.08)")} onClick={() => setConfirmSkipCompliance(r.id)}>
+                            Skip for today
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+
             // ── TASK ROW: full expandable treatment ──
             let leftBorder = MF.border;
             if (isEscalated || isAttention) leftBorder = MF.amber;
@@ -2160,11 +2272,14 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
         <div style={{ marginTop: "12px", display: "flex", flexDirection: "column", gap: "4px", animation: "fadeIn 0.15s ease" }}>
           {stillOpen.map((r) => {
             const isOpen = expandedItem === `still-${r.id}`;
+            const isComp = (r.itemType || "task") === "compliance";
+            const isSkipConfirming = confirmSkipCompliance === `still-${r.id}`;
             const dotColor = r.riskWeight === "high" ? MF.amber : r.riskWeight === "medium" ? MF.secondary : MF.border;
             return (
               <div key={r.id} style={{
-                background: MF.card, border: `1px solid ${MF.border}`,
-                borderLeft: `3px solid ${MF.amber}`,
+                background: MF.card,
+                border: `1px solid ${isComp ? MF.compliance + "40" : MF.border}`,
+                borderLeft: `3px solid ${isComp ? MF.compliance : MF.amber}`,
                 borderRadius: MF.radius, overflow: "hidden",
               }}>
                 <button
@@ -2175,11 +2290,18 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
                     cursor: "pointer", fontFamily: MF.font, textAlign: "left",
                   }}
                 >
-                  <div style={{ width: "8px", height: "8px", borderRadius: "50%", flexShrink: 0, background: dotColor }} />
+                  <div style={{ width: "8px", height: "8px", borderRadius: isComp ? "2px" : "50%", flexShrink: 0, background: isComp ? MF.compliance : dotColor }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: "14px", fontWeight: 600, color: MF.text }}>{r.label}</div>
-                    <div style={{ fontSize: "11px", color: MF.textMuted, marginTop: "1px", lineHeight: 1.3 }}>{r.roleContext}</div>
+                    <div style={{ fontSize: "11px", color: isComp ? MF.compliance : MF.textMuted, marginTop: "1px", lineHeight: 1.3, fontWeight: isComp ? 500 : 400 }}>
+                      {isComp ? `Required — ${r.roleContext.charAt(0).toLowerCase() + r.roleContext.slice(1)}` : r.roleContext}
+                    </div>
                   </div>
+                  {isComp && <span style={{
+                    fontSize: "9px", fontWeight: 700, letterSpacing: "0.05em",
+                    color: MF.compliance, padding: "2px 6px", borderRadius: "4px",
+                    border: `1px solid ${MF.compliance}40`, background: MF.complianceDim,
+                  }}>REQ</span>}
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={MF.textMuted} strokeWidth="2" strokeLinecap="round" style={{
                     transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
                     transition: "transform 0.2s ease", opacity: 0.4, flexShrink: 0,
@@ -2188,17 +2310,36 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
                 {isOpen && (
                   <div style={{ padding: "0 16px 14px", animation: "fadeIn 0.15s ease" }}>
                     <div style={{ fontSize: "13px", color: MF.textMuted, lineHeight: 1.6, marginBottom: "12px" }}>{r.description}</div>
-                    <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-                      <button style={btn(MF.green, MF.greenDim)} onClick={() => { onAction(r.id, S.CONFIRMED); setExpandedItem(null); }}>
-                        Already handled
-                      </button>
-                      <button style={btn(MF.amber, MF.amberDim)} onClick={() => { onAction(r.id, S.NEEDS_ATTENTION); setExpandedItem(null); }}>
-                        Still needs attention
-                      </button>
-                      <button style={btn(MF.textMuted, "rgba(139,148,158,0.08)")} onClick={() => { onAction(r.id, S.NOT_APPLICABLE); setExpandedItem(null); }}>
-                        Skip for today
-                      </button>
-                    </div>
+                    {isSkipConfirming ? (
+                      <div style={{
+                        background: MF.complianceDim, border: `1px solid ${MF.compliance}30`,
+                        borderRadius: MF.radiusSm, padding: "10px 14px", marginBottom: "8px",
+                      }}>
+                        <div style={{ fontSize: "12px", fontWeight: 600, color: MF.compliance, marginBottom: "8px" }}>
+                          This is a compliance requirement. Are you sure?
+                        </div>
+                        <div style={{ display: "flex", gap: "6px" }}>
+                          <button style={btn(MF.compliance, MF.complianceDim)} onClick={() => { onAction(r.id, S.NOT_APPLICABLE); setExpandedItem(null); setConfirmSkipCompliance(null); }}>
+                            Yes, skip today
+                          </button>
+                          <button style={btn(MF.textMuted, "rgba(139,148,158,0.08)")} onClick={() => setConfirmSkipCompliance(null)}>
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                        <button style={btn(MF.green, MF.greenDim)} onClick={() => { onAction(r.id, S.CONFIRMED); setExpandedItem(null); }}>
+                          Already handled
+                        </button>
+                        <button style={btn(MF.amber, MF.amberDim)} onClick={() => { onAction(r.id, S.NEEDS_ATTENTION); setExpandedItem(null); }}>
+                          Still needs attention
+                        </button>
+                        <button style={btn(MF.textMuted, "rgba(139,148,158,0.08)")} onClick={() => { isComp ? setConfirmSkipCompliance(`still-${r.id}`) : (() => { onAction(r.id, S.NOT_APPLICABLE); setExpandedItem(null); })(); }}>
+                          Skip for today
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -3217,6 +3358,7 @@ export default function RxTempo() {
         label: "Warehouse delivery check-in",
         description: "Totes are here. Check in order, verify counts, flag shortages or damages.",
         category: "midday",
+        itemType: "task",
         usualWindow: { startOffset: offset, endOffset: offset + 120 },
         roleContext: "Usually handled by whoever is at the bench.",
         carryLogic: "carry",
@@ -3234,6 +3376,7 @@ export default function RxTempo() {
         label: "OV order check-in",
         description: "Outside vendor delivery is here. Check in order and verify against PO.",
         category: "midday",
+        itemType: "task",
         usualWindow: { startOffset: offset, endOffset: offset + 90 },
         roleContext: "Usually handled by whoever is at the bench.",
         carryLogic: "carry",
@@ -3251,6 +3394,7 @@ export default function RxTempo() {
         label: "USPS pickup — now",
         description: "USPS driver is here. Get all outgoing shipments to pick-n-pack now.",
         category: "deadline",
+        itemType: "task",
         usualWindow: { startOffset: offset, endOffset: offset + 20 },
         roleContext: "All outgoing deliveries need to be handed off.",
         carryLogic: "carry",
@@ -3267,6 +3411,7 @@ export default function RxTempo() {
         label: "USPS pickup prep",
         description: "USPS pickup expected today. Make sure outgoing shipments are ready in pick-n-pack.",
         category: "midday",
+        itemType: "check",
         usualWindow: { startOffset: 180, endOffset: -30 },
         roleContext: "Check that everything outgoing is packaged and labeled.",
         carryLogic: "carry",
