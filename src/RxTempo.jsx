@@ -66,7 +66,7 @@ const RULES = [
     carryLogic: "carry",
     handoffEligibility: null,
     getAheadEligible: false,
-    riskWeight: "medium",
+    riskWeight: "high",
   },
   // ── MIDDAY ──
   {
@@ -113,7 +113,7 @@ const RULES = [
     label: "DUR follow-ups",
     description: "These flags exist because something in the patient's profile needs a pharmacist's eye. Resolving them now means scripts move forward instead of sitting in limbo.",
     category: "midday",
-    itemType: "task",
+    itemType: "compliance",
     usualWindow: { startOffset: 90, endOffset: 300 },
     roleContext: "Clears the path for scripts to fill.",
     carryLogic: "carry",
@@ -154,7 +154,7 @@ const RULES = [
     description: "This is a compliance requirement, but it also protects you and your team. A clean count today means no surprises at audit time.",
     category: "deadline",
     itemType: "compliance",
-    usualWindow: { startOffset: -90, endOffset: -15 },
+    usualWindow: { startOffset: -120, endOffset: -30 },
     roleContext: "Protects the team at audit time.",
     carryLogic: "carry",
     handoffEligibility: "exit",
@@ -173,6 +173,19 @@ const RULES = [
     handoffEligibility: "exit",
     getAheadEligible: false,
     riskWeight: "medium",
+  },
+  {
+    id: "deadline-fridge",
+    label: "Evening temperature log",
+    description: "CDC guidelines require twice-daily temperature logging for vaccine and insulin storage. The closing check catches any drift that happened during the day.",
+    category: "deadline",
+    itemType: "compliance",
+    usualWindow: { startOffset: -45, endOffset: -10 },
+    roleContext: "Second required log of the day.",
+    carryLogic: "carry",
+    handoffEligibility: null,
+    getAheadEligible: false,
+    riskWeight: "high",
   },
   // ── EXIT ──
   {
@@ -210,7 +223,7 @@ const RULES = [
     itemType: "task",
     usualWindow: { startOffset: 60, endOffset: -60 },
     roleContext: "Calm moment? Protect the shelves.",
-    carryLogic: "suppress",
+    carryLogic: "carry",
     handoffEligibility: null,
     getAheadEligible: true,
     riskWeight: "low",
@@ -223,7 +236,7 @@ const RULES = [
     itemType: "task",
     usualWindow: { startOffset: 60, endOffset: -60 },
     roleContext: "Faster pulls, fewer errors.",
-    carryLogic: "suppress",
+    carryLogic: "carry",
     handoffEligibility: null,
     getAheadEligible: true,
     riskWeight: "low",
@@ -236,7 +249,7 @@ const RULES = [
     itemType: "task",
     usualWindow: { startOffset: 120, endOffset: -60 },
     roleContext: "Tomorrow's team will thank you.",
-    carryLogic: "suppress",
+    carryLogic: "carry",
     handoffEligibility: null,
     getAheadEligible: true,
     riskWeight: "low",
@@ -383,7 +396,6 @@ function deriveContext(setup, now) {
   let coverageMode = "solo";
   let inOverlap = false;
   let arrivalWindow = false;
-  let nearOverlapExit = false;
 
   if (overlapWindows && overlapWindows.length > 0) {
     for (const w of overlapWindows) {
@@ -395,11 +407,6 @@ function deriveContext(setup, now) {
       // Arrival window: 10min before overlap starts to 20min after
       if (isTimeInRange(currentMin, (w.start - 10 + 1440) % 1440, (w.start + 20) % 1440)) {
         arrivalWindow = true;
-      }
-      // Near end of overlap
-      const minsToOverlapEnd = ((w.end - currentMin) + 1440) % 1440;
-      if (minsToOverlapEnd <= 20 && minsToOverlapEnd > 0) {
-        nearOverlapExit = true;
       }
     }
     if (!inOverlap) {
@@ -448,7 +455,7 @@ function resolveWindow(rule, setup) {
   } else {
     start = (shiftStart + shiftLen + rule.usualWindow.startOffset + 1440) % 1440;
   }
-  if (rule.usualWindow.endOffset > 0) {
+  if (rule.usualWindow.endOffset >= 0) {
     end = (shiftStart + rule.usualWindow.endOffset) % 1440;
   } else {
     end = (shiftStart + shiftLen + rule.usualWindow.endOffset + 1440) % 1440;
@@ -502,12 +509,12 @@ function computeItemStates(rules, prevStates, setup, ctx, queueState, checkConfi
       continue;
     }
 
-    // ShiftType suppression
-    if (suppressOpening && rule.category === "opening") {
+    // ShiftType suppression (compliance items always surface regardless of shift type)
+    if (suppressOpening && rule.category === "opening" && rule.itemType !== "compliance") {
       result[rule.id] = S.HIDDEN;
       continue;
     }
-    if (suppressDeadline && (rule.category === "deadline" || rule.category === "exit")) {
+    if (suppressDeadline && (rule.category === "deadline" || rule.category === "exit") && rule.itemType !== "compliance") {
       result[rule.id] = S.HIDDEN;
       continue;
     }
@@ -660,6 +667,8 @@ const THEMES = {
     amberDim: "rgba(210,153,34,0.12)",
     compliance: "#C9727E",
     complianceDim: "rgba(201,114,126,0.12)",
+    danger: "#F85149",
+    dangerDim: "rgba(248,81,73,0.12)",
     gradient: "linear-gradient(135deg, #4A9EFF 0%, #3A7FCC 100%)",
     topBarBg: "rgba(15,17,20,0.95)",
     navBg: "rgba(15,17,20,0.95)",
@@ -683,6 +692,8 @@ const THEMES = {
     amberDim: "rgba(191,135,0,0.1)",
     compliance: "#A8505C",
     complianceDim: "rgba(168,80,92,0.1)",
+    danger: "#CF222E",
+    dangerDim: "rgba(207,34,46,0.1)",
     gradient: "linear-gradient(135deg, #2D7ABF 0%, #24629A 100%)",
     topBarBg: "rgba(238,238,242,0.95)",
     navBg: "rgba(238,238,242,0.95)",
@@ -1328,7 +1339,7 @@ function StartDayScreen({ onComplete }) {
             <SelectField label="Shift Type" value={shiftType} onChange={setShiftType} options={validTypes} />
             {shiftError && (
               <div style={{
-                fontSize: "12px", color: overnightWithout24hr ? "#D93D42" : MF.amber,
+                fontSize: "12px", color: overnightWithout24hr ? MF.danger : MF.amber,
                 marginBottom: "12px", marginTop: "-8px",
                 fontWeight: overnightWithout24hr ? 600 : 400,
                 animation: overnightWithout24hr ? "errorPulse 1.2s ease-in-out infinite" : "none",
@@ -1573,14 +1584,14 @@ function StartDayScreen({ onComplete }) {
                 placeholder="6"
                 style={{
                   width: "100%", background: MF.card, color: MF.text,
-                  border: `1px solid ${immZero ? "#D93D42" : immTooLow && !immLowConfirmed ? MF.amber : MF.border}`,
+                  border: `1px solid ${immZero ? MF.danger : immTooLow && !immLowConfirmed ? MF.amber : MF.border}`,
                   borderRadius: MF.radiusSm,
                   padding: "12px 14px", fontSize: "15px", fontFamily: MF.font,
                   outline: "none",
                 }}
               />
               {immZero && (
-                <div style={{ fontSize: "12px", color: "#D93D42", marginTop: "6px", lineHeight: 1.5 }}>
+                <div style={{ fontSize: "12px", color: MF.danger, marginTop: "6px", lineHeight: 1.5 }}>
                   Immunizations are a core part of pharmacy care. Please set a target — even a small one helps protect the community you serve.
                 </div>
               )}
@@ -3827,7 +3838,7 @@ export default function RxTempo() {
             onClick={handleReset}
             style={{
               background: "none", border: `1px solid ${MF.border}`, borderRadius: "6px",
-              padding: "4px", cursor: "pointer", color: "#D93D42",
+              padding: "4px", cursor: "pointer", color: MF.danger,
               display: "flex", alignItems: "center", justifyContent: "center",
             }}
           >
