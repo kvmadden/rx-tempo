@@ -909,16 +909,6 @@ function ConfirmedCard({ rule, state }) {
 }
 
 // Section heading
-function SectionLabel({ children }) {
-  return (
-    <div style={{
-      fontSize: "11px", fontWeight: 600, color: MF.textMuted, textTransform: "uppercase",
-      letterSpacing: "0.06em", marginBottom: "8px", marginTop: "12px",
-    }}>
-      {children}
-    </div>
-  );
-}
 
 // Empty / quiet state
 function QuietState({ message, sub }) {
@@ -1364,7 +1354,7 @@ function StartDayScreen({ onComplete }) {
   }, [shiftValid, shiftType, shiftStart, shiftEnd, storeOpen, storeClose]);
 
   const stepTitles = ["Your shift", "Coverage & events", "Goals & notes"];
-  const totalSteps = 3;
+
   const formStep = step === "form1" ? 0 : step === "form2" ? 1 : step === "form3" ? 2 : -1;
 
   // Step indicator component
@@ -2631,6 +2621,7 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
               <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
                 <button
                   onClick={(e) => { e.stopPropagation(); onVaccine(vaccineCount + 1); }}
+                  aria-label="Add one vaccine"
                   style={{
                     ...btn("#fff", MF.accent),
                     padding: "8px 18px", fontSize: "13px", borderRadius: MF.radiusSm,
@@ -2642,6 +2633,7 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
                 {vaccineCount > 0 && (
                   <button
                     onClick={(e) => { e.stopPropagation(); onVaccine(Math.max(0, vaccineCount - 1)); }}
+                    aria-label="Undo last vaccine"
                     style={{
                       ...btn(MF.textMuted, MF.mutedBg),
                       padding: "8px 12px", fontSize: "12px", borderRadius: MF.radiusSm,
@@ -3198,7 +3190,7 @@ function ExitScreen({ rules, itemStates, ctx, setup, onAction, vaccineCount }) {
         </div>
         <QuietState
           message={scenario.isSolo ? "Not time to close yet." : "Not in the exit window yet."}
-          sub={`About ${Math.round(ctx.minutesUntilEnd)} minutes until shift end.`}
+          sub={`About ${Math.max(0, Math.round(ctx.minutesUntilEnd))} minutes until shift end.`}
         />
       </div>
     );
@@ -3522,13 +3514,13 @@ class AppErrorBoundary extends Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div style={{ padding: "40px 20px", textAlign: "center", fontFamily: "'IBM Plex Sans', -apple-system, sans-serif" }}>
+        <div style={{ padding: "40px 20px", textAlign: "center", fontFamily: "'IBM Plex Sans', -apple-system, sans-serif", colorScheme: "light dark" }}>
           <div style={{ fontSize: "18px", fontWeight: 600, marginBottom: "12px" }}>Something went wrong</div>
-          <div style={{ fontSize: "14px", color: "#888", marginBottom: "20px" }}>RxTempo hit an unexpected error.</div>
+          <div style={{ fontSize: "14px", color: "#777", marginBottom: "20px" }}>RxTempo hit an unexpected error.</div>
           <button
             onClick={() => { this.setState({ hasError: false }); }}
             style={{ padding: "10px 24px", fontSize: "14px", fontWeight: 600, cursor: "pointer",
-              border: "1px solid #444", borderRadius: "8px", background: "transparent", color: "#ccc" }}
+              border: "1px solid #999", borderRadius: "8px", background: "transparent", color: "inherit" }}
           >Try again</button>
         </div>
       );
@@ -3566,12 +3558,32 @@ function RxTempoApp() {
   // Reset scroll position when switching screens
   useEffect(() => { window.scrollTo(0, 0); }, [screen]);
 
-  // Escape key closes reset confirmation
+  // Focus trap and Escape key for reset confirmation dialog
+  const resetDialogRef = useRef(null);
+  const resetPreviousFocusRef = useRef(null);
   useEffect(() => {
     if (!showResetConfirm) return;
-    const h = (e) => { if (e.key === "Escape") setShowResetConfirm(false); };
+    resetPreviousFocusRef.current = document.activeElement;
+    const dialog = resetDialogRef.current;
+    if (dialog) {
+      const first = dialog.querySelector("button");
+      if (first) first.focus();
+    }
+    const h = (e) => {
+      if (e.key === "Escape") { setShowResetConfirm(false); return; }
+      if (e.key !== "Tab" || !dialog) return;
+      const focusable = dialog.querySelectorAll("button");
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    };
     window.addEventListener("keydown", h);
-    return () => window.removeEventListener("keydown", h);
+    return () => {
+      window.removeEventListener("keydown", h);
+      if (resetPreviousFocusRef.current && resetPreviousFocusRef.current.focus) resetPreviousFocusRef.current.focus();
+    };
   }, [showResetConfirm]);
 
   // Tick every 30s (real time)
@@ -3695,7 +3707,7 @@ function RxTempoApp() {
         roleContext: "Check that everything outgoing is packaged and labeled.",
         carryLogic: "carry",
         handoffEligibility: "exit",
-        getAheadEligible: true,
+        getAheadEligible: false,
         riskWeight: "medium",
       });
     }
@@ -4098,7 +4110,7 @@ function RxTempoApp() {
 
       {/* ── RESET CONFIRMATION ── */}
       {showResetConfirm && (
-        <div role="dialog" aria-modal="true" aria-label="Confirm reset" style={{
+        <div ref={resetDialogRef} role="dialog" aria-modal="true" aria-label="Confirm reset" style={{
           position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 200,
           display: "flex", alignItems: "center", justifyContent: "center",
         }}>
