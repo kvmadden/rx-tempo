@@ -2284,43 +2284,127 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
   );
 }
 
-// ARRIVAL HANDSHAKE
-function ArrivalScreen({ rules, itemStates, ctx, onAction }) {
+// ARRIVAL HANDSHAKE — you're the person coming in
+function ArrivalScreen({ rules, itemStates, ctx, onAction, setup }) {
+  const [expandedItem, setExpandedItem] = useState(null);
   const items = rules.filter((r) =>
     r.handoffEligibility === "arrival" &&
     [S.VISIBLE, S.VISIBLE_HANDOFF, S.NEEDS_ATTENTION].includes(itemStates[r.id])
   );
+  const handled = rules.filter((r) =>
+    r.handoffEligibility === "arrival" &&
+    [S.CONFIRMED, S.HANDLED_EARLY].includes(itemStates[r.id])
+  );
 
-  return (
-    <div style={{ padding: "20px", animation: "fadeIn 0.2s ease" }}>
-      <ScreenHeader
-        title="Arrival handshake"
-        subtitle={ctx.arrivalWindow
-          ? "A few things worth checking as you get aligned."
-          : "Handoff items will appear here when the overlap window begins."}
-        ctx={ctx}
-      />
-
-      {!ctx.arrivalWindow && items.length === 0 ? (
+  if (!ctx.arrivalWindow && items.length === 0) {
+    return (
+      <div style={{ padding: "16px", animation: "fadeIn 0.2s ease" }}>
+        <div style={{ fontSize: "12px", color: MF.textMuted, marginBottom: "12px" }}>
+          <span style={{ fontWeight: 600, color: MF.accent }}>Arrival</span>
+          <span style={{ opacity: 0.4 }}> · </span>
+          <span>{fmtTime12(ctx.currentMin)}</span>
+        </div>
         <QuietState
           message="No active arrival window right now."
           sub={ctx.inOverlap ? "You're mid-overlap — check Home for the live board." : "This screen activates when an overlap window starts."}
         />
-      ) : items.length === 0 ? (
-        <QuietState message="Nothing specific for the handshake." sub="You're aligned. Good to go." />
-      ) : (
-        <>
-          <div style={{
-            background: MF.accentDim, borderRadius: MF.radiusSm,
-            padding: "12px 14px", marginBottom: "14px",
-            fontSize: "13px", color: MF.accent, fontWeight: 500, lineHeight: 1.5,
-          }}>
-            {items.length === 1
-              ? "One thing worth a quick alignment."
-              : `${items.length} things worth a quick alignment.`}
-          </div>
-          {items.map((r) => <ItemCard key={r.id} rule={r} state={itemStates[r.id]} onAction={onAction} timingPressure={ctx.timingPressure} />)}
-        </>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ padding: "16px", animation: "fadeIn 0.2s ease" }}>
+      {/* Header — compact */}
+      <div style={{ marginBottom: "12px" }}>
+        <div style={{ fontSize: "12px", color: MF.textMuted, marginBottom: "4px" }}>
+          <span style={{ fontWeight: 600, color: MF.accent }}>Arriving</span>
+          <span style={{ opacity: 0.4 }}> · </span>
+          <span>{fmtTime12(ctx.currentMin)}</span>
+        </div>
+        <div style={{ fontSize: "15px", fontWeight: 600, color: MF.text, letterSpacing: "-0.01em" }}>
+          {items.length === 0
+            ? "You're aligned. Nothing to flag."
+            : items.length === 1
+            ? "One thing to get aligned on."
+            : `${items.length} things to get aligned on.`}
+        </div>
+      </div>
+
+      {/* Context from outgoing — compact inline */}
+      {setup && setup.dayNotes && setup.dayNotes.length > 0 && (
+        <div style={{
+          padding: "8px 12px", marginBottom: "8px",
+          border: `1px solid ${MF.border}`, borderRadius: MF.radiusSm,
+          fontSize: "12px", color: MF.textMuted, lineHeight: 1.4,
+        }}>
+          <span style={{ fontWeight: 600, color: MF.secondary, fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Notes from today</span>
+          {setup.dayNotes.map((n, i) => (
+            <div key={i} style={{ marginTop: "4px" }}>{n}</div>
+          ))}
+        </div>
+      )}
+
+      {/* Handoff items — compact expandable rows */}
+      {items.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "4px", marginBottom: "8px" }}>
+          {items.map((r) => {
+            const isOpen = expandedItem === r.id;
+            const isAttention = itemStates[r.id] === S.NEEDS_ATTENTION;
+            const dotColor = r.riskWeight === "high" ? MF.amber : r.riskWeight === "medium" ? MF.secondary : MF.border;
+
+            return (
+              <div key={r.id} style={{
+                background: MF.card,
+                border: `1px solid ${isAttention ? MF.amber + "4D" : MF.border}`,
+                borderLeft: `3px solid ${isAttention ? MF.amber : MF.accentMid}`,
+                borderRadius: MF.radius, overflow: "hidden",
+              }}>
+                <button
+                  onClick={() => setExpandedItem(isOpen ? null : r.id)}
+                  style={{
+                    width: "100%", display: "flex", alignItems: "center", gap: "8px",
+                    padding: "10px 12px", background: "none", border: "none",
+                    cursor: "pointer", fontFamily: MF.font, textAlign: "left",
+                  }}
+                >
+                  <div style={{ width: "8px", height: "8px", borderRadius: "50%", flexShrink: 0, background: dotColor }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: "14px", fontWeight: 600, color: MF.text }}>{r.label}</div>
+                    <div style={{ fontSize: "11px", color: MF.textMuted, marginTop: "1px" }}>{r.roleContext}</div>
+                  </div>
+                  {isAttention && <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: MF.amber, flexShrink: 0 }} />}
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={MF.textMuted} strokeWidth="2" strokeLinecap="round" style={{
+                    transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
+                    transition: "transform 0.2s ease", opacity: 0.4, flexShrink: 0,
+                  }}><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+
+                {isOpen && (
+                  <div style={{ padding: "0 12px 12px", animation: "fadeIn 0.15s ease" }}>
+                    <div style={{ fontSize: "13px", color: MF.textMuted, lineHeight: 1.5, marginBottom: "10px" }}>
+                      {r.description}
+                    </div>
+                    <div style={{ display: "flex", gap: "6px" }}>
+                      <button style={btn(MF.green, MF.greenDim)} onClick={() => { onAction(r.id, S.CONFIRMED); setExpandedItem(null); }}>
+                        Got it
+                      </button>
+                      <button style={btn(MF.amber, MF.amberDim)} onClick={() => { onAction(r.id, S.NEEDS_ATTENTION); setExpandedItem(null); }}>
+                        Flag this
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Handled count */}
+      {handled.length > 0 && (
+        <div style={{ fontSize: "12px", color: MF.textMuted, textAlign: "center", marginTop: "8px" }}>
+          {handled.length} aligned
+        </div>
       )}
     </div>
   );
@@ -2438,8 +2522,12 @@ function GetAheadScreen({ rules, itemStates, ctx, onAction, queueState }) {
   );
 }
 
-// EXIT CHECKPOINT
+// EXIT CHECKPOINT — you're the person leaving
 function ExitScreen({ rules, itemStates, ctx, setup, onAction, vaccineCount }) {
+  const [expandedItem, setExpandedItem] = useState(null);
+  const [showPassed, setShowPassed] = useState(false);
+  const [showCovered, setShowCovered] = useState(false);
+
   const unresolved = rules.filter((r) =>
     r.handoffEligibility === "exit" &&
     [S.VISIBLE, S.VISIBLE_HANDOFF, S.NEEDS_ATTENTION].includes(itemStates[r.id])
@@ -2448,133 +2536,234 @@ function ExitScreen({ rules, itemStates, ctx, setup, onAction, vaccineCount }) {
     r.handoffEligibility === "exit" &&
     [S.CONFIRMED, S.HANDLED_EARLY].includes(itemStates[r.id])
   );
+  const stillOpenExit = rules.filter((r) => {
+    if (r.category === "getahead") return false;
+    if ([S.CONFIRMED, S.HANDLED_EARLY, S.NOT_APPLICABLE].includes(itemStates[r.id])) return false;
+    if ([S.VISIBLE, S.VISIBLE_HANDOFF, S.NEEDS_ATTENTION].includes(itemStates[r.id])) return false;
+    if (itemStates[r.id] !== S.HIDDEN) return false;
+    const win = resolveWindow(r, setup);
+    return win.end < ctx.currentMin && win.end > 0;
+  });
+
+  // Not in exit window yet
+  if (!ctx.exitWindow) {
+    return (
+      <div style={{ padding: "16px", animation: "fadeIn 0.2s ease" }}>
+        <div style={{ fontSize: "12px", color: MF.textMuted, marginBottom: "12px" }}>
+          <span style={{ fontWeight: 600, color: MF.accent }}>Exit</span>
+          <span style={{ opacity: 0.4 }}> · </span>
+          <span>{fmtTime12(ctx.currentMin)}</span>
+        </div>
+        <QuietState
+          message="Not in the exit window yet."
+          sub={`About ${Math.round(ctx.minutesUntilEnd)} minutes until shift end.`}
+        />
+      </div>
+    );
+  }
 
   return (
-    <div style={{ padding: "20px", animation: "fadeIn 0.2s ease" }}>
-      <ScreenHeader
-        title="Exit checkpoint"
-        subtitle={ctx.exitWindow
-          ? "What's worth mentioning before you leave."
-          : "This screen will show your handoff items as shift end approaches."}
-        ctx={ctx}
-      />
+    <div style={{ padding: "16px", animation: "fadeIn 0.2s ease" }}>
+      {/* Header */}
+      <div style={{ marginBottom: "10px" }}>
+        <div style={{ fontSize: "12px", color: MF.textMuted, marginBottom: "4px" }}>
+          <span style={{ fontWeight: 600, color: MF.accent }}>Handing off</span>
+          <span style={{ opacity: 0.4 }}> · </span>
+          <span>{fmtTime12(ctx.currentMin)}</span>
+        </div>
+        <div style={{ fontSize: "15px", fontWeight: 600, color: MF.text, letterSpacing: "-0.01em" }}>
+          {unresolved.length === 0 && stillOpenExit.length === 0
+            ? "Clean handoff. Nothing unresolved."
+            : unresolved.length + stillOpenExit.length === 1
+            ? "One thing worth mentioning."
+            : `${unresolved.length + stillOpenExit.length} things worth mentioning.`}
+        </div>
+      </div>
 
-      {/* Day note — context for handoff */}
-      {setup && setup.dayNotes && setup.dayNotes.length > 0 && (
+      {/* Shift snapshot — compact inline stats */}
+      <div style={{
+        display: "flex", gap: "0", marginBottom: "10px",
+        border: `1px solid ${MF.border}`, borderRadius: MF.radiusSm, overflow: "hidden",
+      }}>
+        {covered.length > 0 && (
+          <div style={{ flex: 1, padding: "8px 0", textAlign: "center", borderRight: `1px solid ${MF.border}` }}>
+            <div style={{ fontSize: "16px", fontWeight: 700, color: MF.green }}>{covered.length}</div>
+            <div style={{ fontSize: "9px", color: MF.textMuted, textTransform: "uppercase", letterSpacing: "0.05em" }}>covered</div>
+          </div>
+        )}
+        {(unresolved.length > 0 || stillOpenExit.length > 0) && (
+          <div style={{ flex: 1, padding: "8px 0", textAlign: "center", borderRight: setup?.immTarget > 0 ? `1px solid ${MF.border}` : "none" }}>
+            <div style={{ fontSize: "16px", fontWeight: 700, color: MF.amber }}>{unresolved.length + stillOpenExit.length}</div>
+            <div style={{ fontSize: "9px", color: MF.textMuted, textTransform: "uppercase", letterSpacing: "0.05em" }}>to mention</div>
+          </div>
+        )}
+        {setup?.immTarget > 0 && vaccineCount !== undefined && (
+          <div style={{ flex: 1, padding: "8px 0", textAlign: "center" }}>
+            <div style={{ fontSize: "16px", fontWeight: 700, color: vaccineCount >= setup.immTarget ? MF.green : MF.accent }}>{vaccineCount}/{setup.immTarget}</div>
+            <div style={{ fontSize: "9px", color: MF.textMuted, textTransform: "uppercase", letterSpacing: "0.05em" }}>vaccines</div>
+          </div>
+        )}
+      </div>
+
+      {/* Day notes — pass-along context */}
+      {setup?.dayNotes?.length > 0 && (
         <div style={{
-          background: MF.secondaryDim, borderRadius: MF.radiusSm,
-          padding: "10px 14px", marginBottom: "14px",
-          fontSize: "13px", color: MF.secondary, fontWeight: 500,
-          lineHeight: 1.4,
+          padding: "8px 12px", marginBottom: "8px",
+          border: `1px solid ${MF.border}`, borderRadius: MF.radiusSm,
+          fontSize: "12px", color: MF.textMuted, lineHeight: 1.4,
         }}>
+          <span style={{ fontWeight: 600, color: MF.secondary, fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Notes to pass along</span>
           {setup.dayNotes.map((n, i) => (
-            <div key={i} style={{ marginBottom: i < setup.dayNotes.length - 1 ? "4px" : 0 }}>
-              {setup.dayNotes.length > 1 ? `${i + 1}. ${n}` : n}
+            <div key={i} style={{ marginTop: "4px" }}>{n}</div>
+          ))}
+        </div>
+      )}
+
+      {/* Unresolved items — compact expandable rows */}
+      {unresolved.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "4px", marginBottom: "6px" }}>
+          {unresolved.map((r) => {
+            const isOpen = expandedItem === r.id;
+            const isAttention = itemStates[r.id] === S.NEEDS_ATTENTION;
+            const dotColor = r.riskWeight === "high" ? MF.amber : r.riskWeight === "medium" ? MF.secondary : MF.border;
+
+            return (
+              <div key={r.id} style={{
+                background: MF.card,
+                border: `1px solid ${isAttention ? MF.amber + "4D" : MF.border}`,
+                borderLeft: `3px solid ${isAttention ? MF.amber : MF.accentMid}`,
+                borderRadius: MF.radius, overflow: "hidden",
+              }}>
+                <button
+                  onClick={() => setExpandedItem(isOpen ? null : r.id)}
+                  style={{
+                    width: "100%", display: "flex", alignItems: "center", gap: "8px",
+                    padding: "10px 12px", background: "none", border: "none",
+                    cursor: "pointer", fontFamily: MF.font, textAlign: "left",
+                  }}
+                >
+                  <div style={{ width: "8px", height: "8px", borderRadius: "50%", flexShrink: 0, background: dotColor }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: "14px", fontWeight: 600, color: MF.text }}>{r.label}</div>
+                    <div style={{ fontSize: "11px", color: MF.textMuted, marginTop: "1px" }}>{r.roleContext}</div>
+                  </div>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={MF.textMuted} strokeWidth="2" strokeLinecap="round" style={{
+                    transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
+                    transition: "transform 0.2s ease", opacity: 0.4, flexShrink: 0,
+                  }}><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+
+                {isOpen && (
+                  <div style={{ padding: "0 12px 12px", animation: "fadeIn 0.15s ease" }}>
+                    <div style={{ fontSize: "13px", color: MF.textMuted, lineHeight: 1.5, marginBottom: "10px" }}>
+                      {r.description}
+                    </div>
+                    <div style={{ display: "flex", gap: "6px" }}>
+                      <button style={btn(MF.green, MF.greenDim)} onClick={() => { onAction(r.id, S.CONFIRMED); setExpandedItem(null); }}>
+                        Covered
+                      </button>
+                      <button style={btn(MF.amber, MF.amberDim)} onClick={() => { onAction(r.id, S.NEEDS_ATTENTION); setExpandedItem(null); }}>
+                        Mention this
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Summary chips — passed windows + already covered */}
+      {(stillOpenExit.length > 0 || covered.length > 0) && (
+        <div style={{ display: "flex", gap: "6px", marginTop: "8px", flexWrap: "wrap" }}>
+          {stillOpenExit.length > 0 && (
+            <button onClick={() => { setShowPassed(!showPassed); setShowCovered(false); }} style={{
+              padding: "6px 12px", borderRadius: "16px", fontSize: "11px", fontWeight: 600,
+              fontFamily: MF.font, cursor: "pointer",
+              border: `1px solid ${showPassed ? MF.amber + "60" : MF.amber + "40"}`,
+              background: showPassed ? MF.amberDim : "transparent",
+              color: MF.amber,
+            }}>
+              {stillOpenExit.length} window passed
+            </button>
+          )}
+          {covered.length > 0 && (
+            <button onClick={() => { setShowCovered(!showCovered); setShowPassed(false); }} style={{
+              padding: "6px 12px", borderRadius: "16px", fontSize: "11px", fontWeight: 600,
+              fontFamily: MF.font, cursor: "pointer",
+              border: `1px solid ${showCovered ? MF.green + "60" : MF.border}`,
+              background: showCovered ? MF.greenDim : "transparent",
+              color: showCovered ? MF.green : MF.textMuted,
+            }}>
+              {covered.length} covered
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Expanded: window-passed items */}
+      {showPassed && stillOpenExit.length > 0 && (
+        <div style={{ marginTop: "8px", display: "flex", flexDirection: "column", gap: "4px" }}>
+          {stillOpenExit.map((r) => {
+            const isOpen = expandedItem === `passed-${r.id}`;
+            return (
+              <div key={r.id} style={{
+                background: MF.card, border: `1px solid ${MF.border}`,
+                borderLeft: `3px solid ${MF.amber}`,
+                borderRadius: MF.radius, overflow: "hidden",
+              }}>
+                <button
+                  onClick={() => setExpandedItem(isOpen ? null : `passed-${r.id}`)}
+                  style={{
+                    width: "100%", display: "flex", alignItems: "center", gap: "8px",
+                    padding: "10px 12px", background: "none", border: "none",
+                    cursor: "pointer", fontFamily: MF.font, textAlign: "left",
+                  }}
+                >
+                  <div style={{ fontSize: "13px", fontWeight: 600, color: MF.text, flex: 1 }}>{r.label}</div>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={MF.textMuted} strokeWidth="2" strokeLinecap="round" style={{
+                    transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
+                    transition: "transform 0.2s ease", opacity: 0.4,
+                  }}><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+                {isOpen && (
+                  <div style={{ padding: "0 12px 10px", display: "flex", gap: "6px" }}>
+                    <button style={btn(MF.green, MF.greenDim)} onClick={() => { onAction(r.id, S.CONFIRMED); setExpandedItem(null); }}>Handled</button>
+                    <button style={btn(MF.textMuted, "rgba(139,148,158,0.08)")} onClick={() => { onAction(r.id, S.NOT_APPLICABLE); setExpandedItem(null); }}>Skip</button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Expanded: covered items */}
+      {showCovered && covered.length > 0 && (
+        <div style={{ marginTop: "8px", display: "flex", flexDirection: "column", gap: "4px" }}>
+          {covered.map((r) => (
+            <div key={r.id} style={{
+              display: "flex", alignItems: "center", gap: "8px",
+              padding: "8px 12px", border: `1px solid ${MF.border}`,
+              borderRadius: MF.radiusSm, fontSize: "13px", color: MF.textMuted,
+            }}>
+              <span style={{ color: MF.green, display: "flex" }}>{I.check}</span>
+              <span>{r.label}</span>
             </div>
           ))}
         </div>
       )}
 
-      {/* Vaccine summary — handoff context */}
-      {setup && setup.immTarget > 0 && vaccineCount !== undefined && (
-        <div style={{
-          background: MF.accentDim, borderRadius: MF.radiusSm,
-          padding: "10px 14px", marginBottom: "14px",
-          fontSize: "13px", color: MF.accent, fontWeight: 500, lineHeight: 1.4,
-          display: "flex", justifyContent: "space-between", alignItems: "center",
-        }}>
-          <span>Immunizations today</span>
-          <span style={{ fontWeight: 700 }}>{vaccineCount} of {setup.immTarget}</span>
+      {/* Clean handoff message */}
+      {unresolved.length === 0 && stillOpenExit.length === 0 && (
+        <div style={{ textAlign: "center", padding: "12px 0", marginTop: "4px" }}>
+          <div style={{ fontSize: "13px", color: MF.textMuted }}>
+            {covered.length > 0
+              ? `${covered.length} items covered. Thanks for a solid shift.`
+              : "All set. Thanks for keeping things steady."}
+          </div>
         </div>
-      )}
-
-      {unresolved.length === 0 ? (
-        <QuietState
-          message={ctx.exitWindow ? "Clean handoff. Nothing unresolved." : "Not in the exit window yet."}
-          sub={ctx.exitWindow
-            ? (covered.length > 0
-              ? `${covered.length} items covered today. Thanks for keeping patients and the team steady.`
-              : "All set for today. Thanks for keeping patients and the team steady.")
-            : `About ${Math.round(ctx.minutesUntilEnd)} minutes until shift end.`}
-        />
-      ) : (
-        <>
-          <div style={{
-            background: MF.accentDim, borderRadius: MF.radiusSm,
-            padding: "12px 14px", marginBottom: "14px",
-            fontSize: "13px", color: MF.accent, fontWeight: 500, lineHeight: 1.5,
-          }}>
-            {unresolved.length === 1
-              ? "One thing worth a quick mention to whoever is next."
-              : `${unresolved.length} things worth a quick mention to whoever is next.`}
-          </div>
-          {unresolved.map((r) => (
-          <div key={r.id} style={{
-            background: MF.card, border: `1px solid ${MF.border}`, borderRadius: MF.radius,
-            padding: "16px", marginBottom: "10px",
-            borderLeft: `3px solid ${itemStates[r.id] === S.NEEDS_ATTENTION ? MF.amber : MF.accentMid}`,
-          }}>
-            <div style={{ display: "flex", gap: "10px" }}>
-              <div style={{
-                width: "8px", height: "8px", borderRadius: "50%", flexShrink: 0, marginTop: "6px",
-                background: r.riskWeight === "high" ? MF.amber : r.riskWeight === "medium" ? MF.secondary : MF.border,
-              }} />
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: "15px", fontWeight: 600, marginBottom: "4px" }}>{r.label}</div>
-                <div style={{ fontSize: "13px", color: MF.textMuted, lineHeight: 1.5, marginBottom: "10px" }}>{r.description}</div>
-                <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-                  <button style={btn(MF.green, MF.greenDim)} onClick={() => onAction(r.id, S.CONFIRMED)}>
-                    Looks covered
-                  </button>
-                  <button style={btn(MF.amber, MF.amberDim)} onClick={() => onAction(r.id, S.NEEDS_ATTENTION)}>
-                    Still worth mentioning
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        ))}
-        </>
-      )}
-
-      {/* Still open — window passed, worth mentioning at handoff */}
-      {(() => {
-        const stillOpenExit = rules.filter((r) => {
-          if (r.category === "getahead") return false;
-          if ([S.CONFIRMED, S.HANDLED_EARLY, S.NOT_APPLICABLE].includes(itemStates[r.id])) return false;
-          if ([S.VISIBLE, S.VISIBLE_HANDOFF, S.NEEDS_ATTENTION].includes(itemStates[r.id])) return false;
-          if (itemStates[r.id] !== S.HIDDEN) return false;
-          // Exclude items already shown in unresolved
-          if (r.handoffEligibility === "exit" && [S.VISIBLE, S.VISIBLE_HANDOFF, S.NEEDS_ATTENTION].includes(itemStates[r.id])) return false;
-          const win = resolveWindow(r, setup);
-          return win.end < ctx.currentMin && win.end > 0;
-        });
-        if (stillOpenExit.length === 0) return null;
-        return (
-          <>
-            <SectionLabel>Worth mentioning — window passed</SectionLabel>
-            {stillOpenExit.map((r) => (
-              <div key={r.id} style={{
-                background: MF.card, border: `1px solid ${MF.border}`,
-                borderLeft: `3px solid ${MF.amber}`,
-                borderRadius: MF.radius, padding: "12px 16px", marginBottom: "8px",
-              }}>
-                <div style={{ fontSize: "14px", fontWeight: 600, marginBottom: "4px" }}>{r.label}</div>
-                <div style={{ display: "flex", gap: "6px", marginTop: "8px" }}>
-                  <button style={btn(MF.green, MF.greenDim)} onClick={() => onAction(r.id, S.CONFIRMED)}>Already handled</button>
-                  <button style={btn(MF.textMuted, "rgba(139,148,158,0.08)")} onClick={() => onAction(r.id, S.NOT_APPLICABLE)}>Skip</button>
-                </div>
-              </div>
-            ))}
-          </>
-        );
-      })()}
-
-      {covered.length > 0 && (
-        <>
-          <SectionLabel>Already covered</SectionLabel>
-          {covered.map((r) => <ConfirmedCard key={r.id} rule={r} state={itemStates[r.id]} />)}
-        </>
       )}
     </div>
   );
@@ -3102,7 +3291,7 @@ export default function RxTempo() {
   // MAIN APP SHELL
   const screens = {
     home: <HomeScreen rules={activeRules} itemStates={itemStates} ctx={ctx} setup={setup} onAction={handleAction} onNav={setScreen} eventArrivals={eventArrivals} onEventArrival={(key, min) => setEventArrivals((prev) => ({ ...prev, [key]: min }))} queueState={queueState} onQueueState={setQueueState} vaccineCount={vaccineCount} onVaccine={setVaccineCount} dayNoteStates={dayNoteStates} onDayNoteState={(idx, state) => setDayNoteStates((prev) => ({ ...prev, [idx]: state }))} dayNoteConfirm={dayNoteConfirm} onDayNoteConfirm={setDayNoteConfirm} />,
-    arrival: <ArrivalScreen rules={activeRules} itemStates={itemStates} ctx={ctx} onAction={handleActionAndReturn} />,
+    arrival: <ArrivalScreen rules={activeRules} itemStates={itemStates} ctx={ctx} onAction={handleActionAndReturn} setup={setup} />,
     later: <LaterTodayScreen rules={activeRules} itemStates={itemStates} setup={setup} ctx={ctx} onAction={handleAction} />,
     ahead: <GetAheadScreen rules={activeRules} itemStates={itemStates} ctx={ctx} onAction={handleAction} queueState={queueState} />,
     exit: <ExitScreen rules={activeRules} itemStates={itemStates} ctx={ctx} setup={setup} onAction={handleActionAndReturn} vaccineCount={vaccineCount} />,
