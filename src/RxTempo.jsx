@@ -348,6 +348,10 @@ const S = {
   EXPIRED: "expired",
 };
 
+// Pressure ranking for situation-aware check resurfacing
+// Higher number = more pressure. Checks resurface when pressure increases.
+const PRESSURE_RANK = { clear: 0, ontrack: 1, needsfocus: 2, highdemand: 3 };
+
 function deriveContext(setup, now) {
   if (!setup) return null;
   const { shiftStart, shiftEnd, storeOpen, storeClose, overlapWindows } = setup;
@@ -452,7 +456,7 @@ function resolveWindow(rule, setup) {
   return { start, end };
 }
 
-function computeItemStates(rules, prevStates, setup, ctx, queueState) {
+function computeItemStates(rules, prevStates, setup, ctx, queueState, checkConfirmedAt) {
   const result = {};
   const prevActive = Object.values(prevStates).filter(
     (s) => s === S.VISIBLE || s === S.NEEDS_ATTENTION || s === S.VISIBLE_HANDOFF
@@ -461,6 +465,7 @@ function computeItemStates(rules, prevStates, setup, ctx, queueState) {
   const highPressure = prevActive > 5 || ctx.timingPressure === "end-of-day" || q === "highdemand";
   const needsFocus = q === "needsfocus" || q === "highdemand";
   const queuesClear = q === "clear";
+  const confirmedAt = checkConfirmedAt || {};
 
   // ShiftType filtering: suppress categories that don't match the shift posture
   const shiftType = setup.shiftType || "open-close";
@@ -474,10 +479,21 @@ function computeItemStates(rules, prevStates, setup, ctx, queueState) {
   for (const rule of rules) {
     const prev = prevStates[rule.id];
 
-    // User-confirmed states are sticky
+    // User-confirmed states are sticky — EXCEPT checks that should resurface
+    // when queue pressure has escalated since they were last confirmed.
+    // Situation-aware: "waiters check" confirmed during calm → resurface when it gets busy.
     if (prev === S.CONFIRMED || prev === S.HANDLED_EARLY || prev === S.NOT_APPLICABLE) {
-      result[rule.id] = prev;
-      continue;
+      const isCheck = (rule.itemType || "task") === "check";
+      const confirmedPressure = confirmedAt[rule.id];
+      const pressureEscalated = isCheck && confirmedPressure !== undefined &&
+        (PRESSURE_RANK[q] || 0) > (PRESSURE_RANK[confirmedPressure] || 0);
+
+      if (pressureEscalated && prev !== S.NOT_APPLICABLE) {
+        // Let this check fall through to normal window evaluation — it will resurface if still in-window
+      } else {
+        result[rule.id] = prev;
+        continue;
+      }
     }
     // Needs-attention is sticky until user resolves (always counts, no cap)
     if (prev === S.NEEDS_ATTENTION) {
@@ -1690,7 +1706,7 @@ function StartDayScreen({ onComplete }) {
 }
 
 // HOME
-function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArrivals, onEventArrival, queueState, onQueueState, vaccineCount, onVaccine, dayNoteStates, onDayNoteState, dayNoteConfirm, onDayNoteConfirm }) {
+function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArrivals, onEventArrival, queueState, onQueueState, vaccineCount, onVaccine, dayNoteStates, onDayNoteState, dayNoteConfirm, onDayNoteConfirm, checkConfirmedAt }) {
   const [immExpanded, setImmExpanded] = useState(false);
   const [expandedItem, setExpandedItem] = useState(null);
   const [showStillOpen, setShowStillOpen] = useState(false);
@@ -1941,6 +1957,8 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
               (ctx.timingPressure === "tightening" || ctx.timingPressure === "end-of-day");
             const dotColor = r.riskWeight === "high" ? MF.amber : r.riskWeight === "medium" ? MF.secondary : MF.border;
             const isConfirming = justConfirmed === r.id;
+            // Resurfaced check: was confirmed earlier but pressure escalated
+            const resurfaced = isCheck && checkConfirmedAt && checkConfirmedAt[r.id] !== undefined;
 
             // ── CHECK ROW: compact, inline confirm, no expand ──
             if (isCheck && !isAttention) {
@@ -1970,7 +1988,9 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
                       {isConfirming ? "Done" : r.label}
                     </div>
                     {!isConfirming && (
-                      <div style={{ fontSize: "10px", color: MF.textMuted, opacity: 0.6, marginTop: "1px" }}>{r.roleContext}</div>
+                      <div style={{ fontSize: "10px", color: resurfaced ? MF.amber : MF.textMuted, opacity: resurfaced ? 0.8 : 0.6, marginTop: "1px" }}>
+                        {resurfaced ? "Things picked up — worth another look" : r.roleContext}
+                      </div>
                     )}
                   </div>
                   {!isConfirming && (
@@ -3314,6 +3334,7 @@ export default function RxTempo() {
   const [eventArrivals, setEventArrivals] = useState({});
   const [queueState, setQueueState] = useState("ontrack");
   const [vaccineCount, setVaccineCount] = useState(0);
+  const [checkConfirmedAt, setCheckConfirmedAt] = useState({}); // { ruleId: queueState } — tracks pressure level when each check was confirmed
   const [dayNoteStates, setDayNoteStates] = useState({}); // { 0: "active"|"happened"|"dismissed", 1: ... }
   const [dayNoteConfirm, setDayNoteConfirm] = useState(null); // index of note showing dismiss confirm
 
@@ -3427,12 +3448,19 @@ export default function RxTempo() {
   // Recompute item states
   useEffect(() => {
     if (!ctx || !setup) return;
-    setItemStates((prev) => computeItemStates(activeRules, prev, setup, ctx, queueState));
-  }, [ctx, setup, activeRules, queueState]);
+    setItemStates((prev) => computeItemStates(activeRules, prev, setup, ctx, queueState, checkConfirmedAt));
+  }, [ctx, setup, activeRules, queueState, checkConfirmedAt]);
 
   const handleAction = useCallback((ruleId, newState) => {
     setItemStates((prev) => ({ ...prev, [ruleId]: newState }));
-  }, []);
+    // Track queue pressure at confirmation time for checks (enables situation-aware resurfacing)
+    if (newState === S.CONFIRMED || newState === S.HANDLED_EARLY) {
+      const rule = activeRules.find((r) => r.id === ruleId);
+      if (rule && (rule.itemType || "task") === "check") {
+        setCheckConfirmedAt((prev) => ({ ...prev, [ruleId]: queueState }));
+      }
+    }
+  }, [activeRules, queueState]);
 
   // Auto-return: after acting on arrival/exit items, return to Home after a beat
   const handleActionAndReturn = useCallback((ruleId, newState) => {
@@ -3443,6 +3471,7 @@ export default function RxTempo() {
   const handleSetup = (data) => {
     setSetup(data);
     setItemStates({});
+    setCheckConfirmedAt({});
     setScreen("home");
     // Default sim time to shift start
     setSimTime(data.shiftStart);
@@ -3451,6 +3480,7 @@ export default function RxTempo() {
   const handleReset = () => {
     setSetup(null);
     setItemStates({});
+    setCheckConfirmedAt({});
     setEventArrivals({});
     setQueueState("ontrack");
     setVaccineCount(0);
@@ -3740,7 +3770,7 @@ export default function RxTempo() {
 
   // MAIN APP SHELL
   const screens = {
-    home: <HomeScreen rules={activeRules} itemStates={itemStates} ctx={ctx} setup={setup} onAction={handleAction} onNav={setScreen} eventArrivals={eventArrivals} onEventArrival={(key, min) => setEventArrivals((prev) => ({ ...prev, [key]: min }))} queueState={queueState} onQueueState={setQueueState} vaccineCount={vaccineCount} onVaccine={setVaccineCount} dayNoteStates={dayNoteStates} onDayNoteState={(idx, state) => setDayNoteStates((prev) => ({ ...prev, [idx]: state }))} dayNoteConfirm={dayNoteConfirm} onDayNoteConfirm={setDayNoteConfirm} />,
+    home: <HomeScreen rules={activeRules} itemStates={itemStates} ctx={ctx} setup={setup} onAction={handleAction} onNav={setScreen} eventArrivals={eventArrivals} onEventArrival={(key, min) => setEventArrivals((prev) => ({ ...prev, [key]: min }))} queueState={queueState} onQueueState={setQueueState} vaccineCount={vaccineCount} onVaccine={setVaccineCount} dayNoteStates={dayNoteStates} onDayNoteState={(idx, state) => setDayNoteStates((prev) => ({ ...prev, [idx]: state }))} dayNoteConfirm={dayNoteConfirm} onDayNoteConfirm={setDayNoteConfirm} checkConfirmedAt={checkConfirmedAt} />,
     arrival: <ArrivalScreen rules={activeRules} itemStates={itemStates} ctx={ctx} onAction={handleActionAndReturn} setup={setup} />,
     later: <LaterTodayScreen rules={activeRules} itemStates={itemStates} setup={setup} ctx={ctx} onAction={handleAction} />,
     ahead: <GetAheadScreen rules={activeRules} itemStates={itemStates} ctx={ctx} onAction={handleAction} queueState={queueState} />,
@@ -3814,7 +3844,7 @@ export default function RxTempo() {
           simTime={simTime ?? setup.shiftStart}
           onSimTimeChange={handleSimTimeChange}
           onClose={() => setSimMode(false)}
-          onReset={() => setItemStates({})}
+          onReset={() => { setItemStates({}); setCheckConfirmedAt({}); }}
           shiftStart={setup.shiftStart}
           shiftEnd={setup.shiftEnd}
         />
