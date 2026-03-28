@@ -4075,9 +4075,9 @@ function RxTempoApp() {
       )}
 
       {/* ── CONTENT ── */}
-      <div key={screen} style={{ flex: 1, overflowY: "auto", paddingBottom: "80px", animation: "fadeIn 0.2s ease" }}>
+      <main key={screen} style={{ flex: 1, overflowY: "auto", paddingBottom: "80px", animation: "fadeIn 0.2s ease" }}>
         {screens[screen]}
-      </div>
+      </main>
 
       {/* ── BOTTOM NAV ── */}
       <nav aria-label="Main navigation" style={{
