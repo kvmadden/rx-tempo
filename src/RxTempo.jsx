@@ -1711,10 +1711,11 @@ function StartDayScreen({ onComplete }) {
           <>
             {/* Immunization target — required */}
             <div style={{ marginBottom: "20px" }}>
-              <label style={{ fontSize: "12px", fontWeight: 600, color: MF.textMuted, marginBottom: "8px", display: "block", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+              <label htmlFor="imm-target" style={{ fontSize: "12px", fontWeight: 600, color: MF.textMuted, marginBottom: "8px", display: "block", textTransform: "uppercase", letterSpacing: "0.06em" }}>
                 Immunization target today
               </label>
               <input
+                id="imm-target"
                 type="number"
                 inputMode="numeric"
                 min="1"
@@ -1779,6 +1780,7 @@ function StartDayScreen({ onComplete }) {
               {dayNotes.map((note, idx) => (
                 <div key={note.id} style={{ display: "flex", gap: "8px", marginBottom: "8px" }}>
                   <input
+                    aria-label={`Day note ${idx + 1}`}
                     type="text"
                     value={note.text}
                     onChange={(e) => {
@@ -3481,6 +3483,7 @@ function TimeSimulator({ simTime, onSimTimeChange, onClose, onReset, shiftStart,
       </div>
 
       <input
+        aria-label="Simulated time"
         type="range"
         min={sliderMin}
         max={sliderMax}
@@ -3749,6 +3752,7 @@ function RxTempoApp() {
     @keyframes errorPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     select option { background: ${MF.selectBg}; color: ${MF.selectText}; }
+    * { scrollbar-width: thin; scrollbar-color: ${MF.border} transparent; }
     ::-webkit-scrollbar { width: 3px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: ${MF.border}; border-radius: 3px; }
     button:active { transform: scale(0.97); }
     button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid ${MF.accent}; outline-offset: 2px; }
