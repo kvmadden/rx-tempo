@@ -8,6 +8,7 @@ const RULES = [
     label: "Opening orientation",
     description: "Knowing what carried over and what's ahead means fewer surprises once patients start arriving. A two-minute scan now sets the rhythm for the whole shift.",
     category: "opening",
+    itemType: "check",
     usualWindow: { startOffset: 0, endOffset: 30 },
     roleContext: "Set the pace before the first patient walks in.",
     carryLogic: "suppress",
@@ -20,6 +21,7 @@ const RULES = [
     label: "Registers and systems ready",
     description: "A patient shouldn't have to wait because a register isn't logged in. Getting systems live before the doors open keeps the first interaction smooth.",
     category: "opening",
+    itemType: "check",
     usualWindow: { startOffset: 0, endOffset: 20 },
     roleContext: "Smooth first impression for the day.",
     carryLogic: "suppress",
@@ -32,6 +34,7 @@ const RULES = [
     label: "Will call check",
     description: "Patients get frustrated when their script isn't where it should be. A quick scan now catches misfiled bags and expiring holds before they become pickup problems.",
     category: "opening",
+    itemType: "check",
     usualWindow: { startOffset: 5, endOffset: 60 },
     roleContext: "Prevents surprises at the pickup window.",
     carryLogic: "carry",
@@ -44,6 +47,7 @@ const RULES = [
     label: "Delivery scan",
     description: "Catching a short-ship early means you can reorder before it affects a patient. Waiting until someone needs the med makes it urgent instead of routine.",
     category: "opening",
+    itemType: "check",
     usualWindow: { startOffset: 0, endOffset: 90 },
     roleContext: "Keeps inventory gaps from reaching patients.",
     carryLogic: "carry",
@@ -56,6 +60,7 @@ const RULES = [
     label: "Refrigerator temperature log",
     description: "An out-of-range fridge can mean thousands in lost vaccine and insulin inventory. A 30-second check protects product and keeps you compliant.",
     category: "opening",
+    itemType: "check",
     usualWindow: { startOffset: 0, endOffset: 45 },
     roleContext: "Protects high-value inventory.",
     carryLogic: "carry",
@@ -69,6 +74,7 @@ const RULES = [
     label: "Queue and production check",
     description: "A stuck claim or missing part can snowball into a long wait at pickup. Catching it now keeps the line moving and patients happy.",
     category: "midday",
+    itemType: "check",
     usualWindow: { startOffset: 120, endOffset: 240 },
     roleContext: "Keeps small problems from becoming big waits.",
     carryLogic: "carry",
@@ -81,6 +87,7 @@ const RULES = [
     label: "Immunization appointments",
     description: "A patient who booked an appointment chose your pharmacy on purpose. Having supplies ready and the schedule in mind honors that trust.",
     category: "midday",
+    itemType: "task",
     usualWindow: { startOffset: 120, endOffset: 300 },
     roleContext: "Patients planned around this — be ready.",
     carryLogic: "carry",
@@ -93,6 +100,7 @@ const RULES = [
     label: "Cycle count window",
     description: "Accurate counts prevent phantom stock situations — where the system says you have it but the shelf is empty. Mid-shift is usually the calmest window.",
     category: "midday",
+    itemType: "task",
     usualWindow: { startOffset: 150, endOffset: 330 },
     roleContext: "Best done during a calm stretch.",
     carryLogic: "carry",
@@ -105,6 +113,7 @@ const RULES = [
     label: "DUR follow-ups",
     description: "These flags exist because something in the patient's profile needs a pharmacist's eye. Resolving them now means scripts move forward instead of sitting in limbo.",
     category: "midday",
+    itemType: "task",
     usualWindow: { startOffset: 90, endOffset: 300 },
     roleContext: "Clears the path for scripts to fill.",
     carryLogic: "carry",
@@ -117,6 +126,7 @@ const RULES = [
     label: "MTM alerts",
     description: "These are patients where a quick conversation can genuinely improve outcomes. Documenting it also keeps the store's clinical metrics healthy.",
     category: "midday",
+    itemType: "task",
     usualWindow: { startOffset: 120, endOffset: 360 },
     roleContext: "Real impact on patient outcomes.",
     carryLogic: "carry",
@@ -130,6 +140,7 @@ const RULES = [
     label: "Return to stock cutoff",
     description: "Scripts sitting past their hold window tie up inventory other patients might need. Returning them frees up stock and keeps the shelves accurate.",
     category: "deadline",
+    itemType: "task",
     usualWindow: { startOffset: 300, endOffset: 480 },
     roleContext: "Frees up inventory for patients who need it.",
     carryLogic: "carry",
@@ -142,6 +153,7 @@ const RULES = [
     label: "Controlled substance reconciliation",
     description: "This is a compliance requirement, but it also protects you and your team. A clean count today means no surprises at audit time.",
     category: "deadline",
+    itemType: "task",
     usualWindow: { startOffset: -90, endOffset: -15 },
     roleContext: "Protects the team at audit time.",
     carryLogic: "carry",
@@ -154,6 +166,7 @@ const RULES = [
     label: "End-of-day reports",
     description: "These reports catch exceptions before they carry over. Reviewing now means tomorrow's opener doesn't inherit problems you could have flagged today.",
     category: "deadline",
+    itemType: "task",
     usualWindow: { startOffset: -60, endOffset: -10 },
     roleContext: "Sets up tomorrow's team for success.",
     carryLogic: "carry",
@@ -167,6 +180,7 @@ const RULES = [
     label: "Queue state at handoff",
     description: "The person coming in next can't see what you saw today. A quick heads-up on queue depth saves them from walking in blind.",
     category: "exit",
+    itemType: "check",
     usualWindow: { startOffset: -30, endOffset: 0 },
     roleContext: "Nobody likes walking in blind.",
     carryLogic: "carry",
@@ -179,6 +193,7 @@ const RULES = [
     label: "Unresolved issues to mention",
     description: "An unmentioned callback or pending prior auth can leave a patient hanging. A 60-second verbal handoff closes the loop and builds team trust.",
     category: "exit",
+    itemType: "task",
     usualWindow: { startOffset: -30, endOffset: 0 },
     roleContext: "Keeps patients from falling through the cracks.",
     carryLogic: "carry",
@@ -192,6 +207,7 @@ const RULES = [
     label: "Outdate pull",
     description: "Expired product on the shelf is a dispensing risk and a compliance issue. Pulling it now means one less thing to worry about later.",
     category: "getahead",
+    itemType: "task",
     usualWindow: { startOffset: 60, endOffset: -60 },
     roleContext: "Calm moment? Protect the shelves.",
     carryLogic: "suppress",
@@ -204,6 +220,7 @@ const RULES = [
     label: "Shelf facing and organization",
     description: "A tidy shelf means faster pulls and fewer pick errors. It's a small investment that speeds up everyone's workflow for the rest of the day.",
     category: "getahead",
+    itemType: "task",
     usualWindow: { startOffset: 60, endOffset: -60 },
     roleContext: "Faster pulls, fewer errors.",
     carryLogic: "suppress",
@@ -216,6 +233,7 @@ const RULES = [
     label: "Smart count prep",
     description: "Getting ahead on tomorrow's counts means tomorrow's team starts with a cleaner board. Good days are built the shift before.",
     category: "getahead",
+    itemType: "task",
     usualWindow: { startOffset: 120, endOffset: -60 },
     roleContext: "Tomorrow's team will thank you.",
     carryLogic: "suppress",
@@ -229,6 +247,7 @@ const RULES = [
     label: "Waiters check",
     description: "Someone sitting in the waiting area is watching the clock. A quick scan catches anyone who's been waiting longer than they should.",
     category: "midday",
+    itemType: "check",
     usualWindow: { startOffset: 60, endOffset: 360 },
     roleContext: "Someone might be watching the clock.",
     carryLogic: "carry",
@@ -241,6 +260,7 @@ const RULES = [
     label: "Pharmacy voicemail",
     description: "A prescriber callback sitting in voicemail can delay a patient's fill for hours. Clearing the queue keeps things moving for everyone.",
     category: "midday",
+    itemType: "check",
     usualWindow: { startOffset: 90, endOffset: 240 },
     roleContext: "Unanswered calls delay patient care.",
     carryLogic: "carry",
@@ -253,6 +273,7 @@ const RULES = [
     label: "Patient callbacks",
     description: "These patients are waiting to hear from you — about insurance, a special order, or a prior auth. Following up builds the kind of trust that keeps them coming back.",
     category: "midday",
+    itemType: "task",
     usualWindow: { startOffset: 120, endOffset: 360 },
     roleContext: "Someone is waiting to hear from you.",
     carryLogic: "carry",
@@ -265,6 +286,7 @@ const RULES = [
     label: "ReadyFill review",
     description: "Auto-fills that need intervention will just sit there until someone looks. Catching them now prevents a patient from showing up to nothing ready.",
     category: "midday",
+    itemType: "task",
     usualWindow: { startOffset: 150, endOffset: 300 },
     roleContext: "Prevents empty-handed pickups.",
     carryLogic: "carry",
@@ -529,13 +551,15 @@ function computeItemStates(rules, prevStates, setup, ctx, queueState) {
 }
 
 // ─── PACING LANGUAGE ───
-function getPacingLine(ctx, visibleCount, coverageMode, queueState, coveredCount, totalActionable) {
+function getPacingLine(ctx, visibleCount, coverageMode, queueState, coveredCount, totalActionable, taskCount, checkCount) {
   if (!ctx) return "";
   const mode = coverageMode || "solo";
   const q = queueState || "ontrack";
   const c = coveredCount || 0;
   const total = totalActionable || 1;
   const pct = total > 0 ? c / total : 0;
+  const tasks = taskCount || 0;
+  const checks = checkCount || 0;
 
   // High demand override — protective
   if (q === "highdemand") {
@@ -563,6 +587,7 @@ function getPacingLine(ctx, visibleCount, coverageMode, queueState, coveredCount
   }
   if (visibleCount === 1) {
     if (c > 0) return `${c} covered. One more worth attention.`;
+    if (checks === 1) return "One quick check.";
     if (ctx.exitWindow) return "One thing worth mentioning before you go.";
     if (mode === "overlap") return "One thing worth aligning on.";
     return "One thing worth attention right now.";
@@ -572,11 +597,14 @@ function getPacingLine(ctx, visibleCount, coverageMode, queueState, coveredCount
     if (c > 0) return `Rolling — ${visibleCount} left right now.`;
     if (ctx.exitWindow) return `${visibleCount} things to check before you go.`;
     if (q === "needsfocus") return `${visibleCount} items. Let's protect the rest of the day.`;
+    if (tasks > 0 && checks > 0) return `${tasks} task${tasks > 1 ? "s" : ""}, ${checks} quick check${checks > 1 ? "s" : ""}.`;
+    if (checks === visibleCount) return `${checks} quick check${checks > 1 ? "s" : ""}.`;
     return `${visibleCount} things worth attention right now.`;
   }
   if (visibleCount <= 5) {
     if (c > 0) return `${c} covered, ${visibleCount} on the board.`;
     if (ctx.timingPressure === "tightening") return `${visibleCount} items — window is tightening.`;
+    if (tasks > 0 && checks > 0) return `${tasks} task${tasks > 1 ? "s" : ""} and ${checks} check${checks > 1 ? "s" : ""} on the board.`;
     return `${visibleCount} items on the board.`;
   }
   if (c > 0) return `${c} covered. Busy board — showing what matters most.`;
@@ -1727,7 +1755,9 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
     return ctx.currentMin > win.end && ctx.currentMin < win.start;
   });
 
-  const pacingLine = getPacingLine(ctx, visible.length, ctx.coverageMode, queueState, coveredCount, totalActionable);
+  const visibleTasks = visible.filter((r) => (r.itemType || "task") === "task").length;
+  const visibleChecks = visible.filter((r) => (r.itemType || "task") === "check").length;
+  const pacingLine = getPacingLine(ctx, visible.length, ctx.coverageMode, queueState, coveredCount, totalActionable, visibleTasks, visibleChecks);
   const phaseLabel = getPhaseLabel(ctx);
   const highPressure = visible.length > 5 || queueState === "highdemand" || queueState === "needsfocus";
 
@@ -1886,13 +1916,14 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
         );
       })()}
 
-      {/* Visible items — compact rows with expand */}
+      {/* Visible items — checks (quick) and tasks (expandable) */}
       {visible.length > 0 && (() => {
         const shown = showAllVisible ? visible : visible.slice(0, MAX_SHOWN);
         const hiddenCount = visible.length - MAX_SHOWN;
         return (
         <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
           {shown.map((r) => {
+            const isCheck = (r.itemType || "task") === "check";
             const isOpen = expandedItem === r.id;
             const st = itemStates[r.id];
             const isAttention = st === S.NEEDS_ATTENTION;
@@ -1900,11 +1931,60 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
             const isEscalated = isAttention && r.riskWeight === "high" &&
               (ctx.timingPressure === "tightening" || ctx.timingPressure === "end-of-day");
             const dotColor = r.riskWeight === "high" ? MF.amber : r.riskWeight === "medium" ? MF.secondary : MF.border;
+            const isConfirming = justConfirmed === r.id;
+
+            // ── CHECK ROW: compact, inline confirm, no expand ──
+            if (isCheck && !isAttention) {
+              return (
+                <div key={r.id} style={{
+                  background: isConfirming ? MF.greenDim : MF.card,
+                  border: `1px solid ${isConfirming ? MF.green + "60" : MF.border}`,
+                  transition: "all 0.3s ease",
+                  transform: isConfirming ? "scale(0.98)" : "scale(1)",
+                  opacity: isConfirming ? 0.85 : 1,
+                  borderRadius: MF.radiusSm,
+                  animation: "slideUp 0.25s ease both",
+                  display: "flex", alignItems: "center", gap: "8px",
+                  padding: "8px 12px",
+                }}>
+                  <div style={{
+                    width: "6px", height: "6px", borderRadius: "50%", flexShrink: 0,
+                    background: isConfirming ? MF.green : dotColor, opacity: 0.6,
+                    transition: "background 0.2s ease",
+                  }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{
+                      fontSize: "13px", fontWeight: 500,
+                      color: isConfirming ? MF.green : MF.text,
+                      transition: "color 0.2s ease",
+                    }}>
+                      {isConfirming ? "Done" : r.label}
+                    </div>
+                    {!isConfirming && (
+                      <div style={{ fontSize: "10px", color: MF.textMuted, opacity: 0.6, marginTop: "1px" }}>{r.roleContext}</div>
+                    )}
+                  </div>
+                  {!isConfirming && (
+                    <button
+                      onClick={() => handleConfirm(r.id)}
+                      style={{
+                        background: MF.greenDim, color: MF.green, border: "none",
+                        borderRadius: "12px", padding: "4px 10px",
+                        fontSize: "11px", fontWeight: 600, fontFamily: MF.font,
+                        cursor: "pointer", flexShrink: 0, whiteSpace: "nowrap",
+                      }}
+                    >
+                      {I.check} Done
+                    </button>
+                  )}
+                </div>
+              );
+            }
+
+            // ── TASK ROW: full expandable treatment ──
             let leftBorder = MF.border;
             if (isEscalated || isAttention) leftBorder = MF.amber;
             else if (isHandoff) leftBorder = MF.accentMid;
-
-            const isConfirming = justConfirmed === r.id;
 
             return (
               <div key={r.id} style={{
