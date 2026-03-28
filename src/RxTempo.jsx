@@ -726,85 +726,6 @@ function SelectField({ label, value, onChange, options, style: extraStyle }) {
   );
 }
 
-// Item card with actions
-function ItemCard({ rule, state, onAction, showRole = true, timingPressure }) {
-  const isAttention = state === S.NEEDS_ATTENTION;
-  const isHandoff = state === S.VISIBLE_HANDOFF;
-  const isEscalated = isAttention && rule.riskWeight === "high" &&
-    (timingPressure === "tightening" || timingPressure === "end-of-day");
-  const isTightening = !isAttention && !isEscalated && rule.riskWeight === "high" &&
-    (timingPressure === "tightening" || timingPressure === "end-of-day");
-
-  let borderColor = MF.border;
-  if (isEscalated) borderColor = MF.amber;
-  else if (isAttention) borderColor = MF.amber;
-  else if (isTightening) borderColor = MF.secondary;
-  else if (isHandoff) borderColor = MF.accentMid;
-
-  return (
-    <div style={{
-      background: isEscalated ? MF.amberDim : MF.card,
-      border: `1px solid ${isEscalated ? MF.amber + "4D" : MF.border}`,
-      borderLeft: `3px solid ${borderColor}`,
-      borderRadius: MF.radius,
-      padding: "16px",
-      marginBottom: "10px",
-      animation: "slideUp 0.25s ease both",
-    }}>
-      <div style={{ display: "flex", gap: "10px" }}>
-        <div style={{
-          width: "8px", height: "8px", borderRadius: "50%", flexShrink: 0, marginTop: "6px",
-          background: rule.riskWeight === "high" ? MF.amber : rule.riskWeight === "medium" ? MF.secondary : MF.border,
-        }} />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
-            <span style={{ fontSize: "15px", fontWeight: 600, letterSpacing: "-0.01em" }}>
-              {rule.label}
-            </span>
-            {isHandoff && (
-              <span style={badge(MF.accent, MF.accentDim)}>Handoff</span>
-            )}
-          </div>
-          <div style={{ fontSize: "13px", color: MF.textMuted, lineHeight: 1.5, marginBottom: showRole ? "6px" : "12px" }}>
-            {rule.description}
-          </div>
-          {showRole && (
-            <div style={{ fontSize: "11px", color: MF.textMuted, fontStyle: "italic", opacity: 0.65, marginBottom: "12px" }}>
-              {rule.roleContext}
-            </div>
-          )}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-            {isEscalated && (
-              <span style={{ ...badge(MF.amber, MF.amberDim), marginBottom: "6px", marginRight: "auto", width: "100%" }}>
-                Entering a tighter window
-              </span>
-            )}
-            {isTightening && (
-              <span style={{ ...badge(MF.secondary, MF.secondaryDim), marginBottom: "6px", marginRight: "auto", width: "100%" }}>
-                Worth checking soon
-              </span>
-            )}
-            {isAttention && !isEscalated && (
-              <span style={{ ...badge(MF.amber, MF.amberDim), marginBottom: "6px", marginRight: "auto", width: "100%" }}>
-                Still needs attention
-              </span>
-            )}
-            <button style={btn(MF.green, MF.greenDim)} onClick={() => onAction(rule.id, S.CONFIRMED)}>
-              Looks done
-            </button>
-            <button style={btn(MF.amber, MF.amberDim)} onClick={() => onAction(rule.id, S.NEEDS_ATTENTION)}>
-              Still needs attention
-            </button>
-            <button style={btn(MF.textMuted, "rgba(139,148,158,0.08)")} onClick={() => onAction(rule.id, S.NOT_APPLICABLE)}>
-              Skip for today
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // Confirmed item (collapsed)
 function ConfirmedCard({ rule, state }) {
   return (
@@ -869,8 +790,8 @@ function InfoPanel({ show, onClose }) {
     { key: "how", title: "How it works", icon: "◎", render: () => (
       <>
         <Line label="Input" value="Time + role + shift" />
-        <Line label="Engine" value="22 time-aware rules" />
-        <Line label="Output" value="What matters right now" />
+        <Line label="Engine" value="Surfaces what matters now — time, progress, what's handled" />
+        <Line label="Output" value="Right task, right moment" />
         <Line label="Adapts to" value="Queue pressure + coverage" />
         <Line label="Resets" value="Every shift (24hr max)" />
       </>
@@ -938,11 +859,11 @@ function InfoPanel({ show, onClose }) {
     )},
     { key: "leader", title: "For leadership", icon: "◆", render: () => (
       <>
-        <Bullet>No new data streams or reporting</Bullet>
-        <Bullet>No performance metrics — ever</Bullet>
-        <Bullet>Immunizations reinforced as constant priority</Bullet>
-        <Bullet>Gets quieter on bad days, not louder</Bullet>
-        <Bullet>Designed as an optional pilot</Bullet>
+        <Bullet>Keeps immunizations visible as a daily priority</Bullet>
+        <Bullet>Helps staff stay organized without adding oversight</Bullet>
+        <Bullet>Adapts to busy days — quieter when it counts</Bullet>
+        <Bullet>Nothing tracked, reported, or stored</Bullet>
+        <Bullet>Easy to pilot — no setup, no rollout risk</Bullet>
       </>
     )},
     { key: "principles", title: "Design principles", icon: "◇", render: () => (
@@ -1042,26 +963,6 @@ function InfoPanel({ show, onClose }) {
           <div style={{ fontWeight: 600, letterSpacing: "0.04em" }}>MADDEN FRAMEWORKS · © 2026</div>
         </div>
       </div>
-    </div>
-  );
-}
-
-function ScreenHeader({ title, subtitle, ctx }) {
-  return (
-    <div style={{ marginBottom: "20px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-        <h1 style={{ fontSize: "22px", fontWeight: 600, letterSpacing: "-0.02em", marginBottom: "4px" }}>
-          {title}
-        </h1>
-        {ctx && (
-          <span style={{ fontSize: "12px", color: MF.textMuted }}>
-            {fmtTime12(ctx.currentMin)}
-          </span>
-        )}
-      </div>
-      <p style={{ fontSize: "14px", color: MF.textMuted, lineHeight: 1.45 }}>
-        {subtitle}
-      </p>
     </div>
   );
 }
@@ -1298,9 +1199,9 @@ function StartDayScreen({ onComplete }) {
             Start your day
           </h1>
           <p style={{ fontSize: "14px", color: MF.textMuted, lineHeight: 1.45 }}>
-            {step === "form1" ? "The basics — role and shift." :
-             step === "form2" ? "Coverage and what to expect today." :
-             "Immunizations, guidance, and notes."}
+            {step === "form1" ? "Let's get your shift set up." :
+             step === "form2" ? "Who else is working and what's coming in." :
+             "A few optional things to dial in."}
           </p>
         </div>
 
@@ -1584,7 +1485,7 @@ function StartDayScreen({ onComplete }) {
                   animation: immNudgeFlash ? "errorPulse 0.4s ease-in-out" : "none",
                 }} onAnimationEnd={() => setImmNudgeFlash(false)}>
                   <div style={{ fontSize: "12px", color: MF.textMuted, lineHeight: 1.5, marginBottom: "8px" }}>
-                    A target of {immNum} means very few patients are being offered protection today. If this truly reflects your store's patient volume, confirm below — but most pharmacies can do more.
+                    That's a low target. If it reflects your volume, that's fine — confirm below.
                   </div>
                   <button
                     onClick={() => setImmLowConfirmed(true)}
@@ -2520,6 +2421,10 @@ function ArrivalScreen({ rules, itemStates, ctx, onAction, setup }) {
 
 // LATER TODAY
 function LaterTodayScreen({ rules, itemStates, setup, ctx, onAction }) {
+  const [expandedItem, setExpandedItem] = useState(null);
+  const [showAll, setShowAll] = useState(false);
+  const MAX_SHOWN = 5;
+
   const laterItems = rules.filter((r) => {
     if ([S.CONFIRMED, S.HANDLED_EARLY, S.NOT_APPLICABLE].includes(itemStates[r.id])) return false;
     if (r.category === "getahead") return false;
@@ -2530,48 +2435,108 @@ function LaterTodayScreen({ rules, itemStates, setup, ctx, onAction }) {
     return win.start > ctx.currentMin;
   });
 
+  const shown = showAll ? laterItems : laterItems.slice(0, MAX_SHOWN);
+  const hiddenCount = laterItems.length - MAX_SHOWN;
+
   return (
-    <div style={{ padding: "20px", animation: "fadeIn 0.2s ease" }}>
-      <ScreenHeader
-        title="Later today"
-        subtitle="What's likely to matter later. No action needed yet."
-        ctx={ctx}
-      />
+    <div style={{ padding: "16px", animation: "fadeIn 0.2s ease" }}>
+      <div style={{ fontSize: "12px", color: MF.textMuted, marginBottom: "4px" }}>
+        <span style={{ fontWeight: 600, color: MF.accent }}>Later today</span>
+        <span style={{ opacity: 0.4 }}> · </span>
+        <span>{fmtTime12(ctx.currentMin)}</span>
+      </div>
+      <div style={{ fontSize: "15px", fontWeight: 600, color: MF.text, letterSpacing: "-0.01em", marginBottom: "12px" }}>
+        {laterItems.length === 0 ? "Nothing upcoming" : `${laterItems.length} item${laterItems.length === 1 ? "" : "s"} coming up later`}
+      </div>
 
       {laterItems.length === 0 ? (
         <QuietState message="Everything upcoming is already on your board." sub="You're ahead of the curve." />
       ) : (
-        laterItems.map((r) => {
-          const win = resolveWindow(r, setup);
-          return (
-            <div key={r.id} style={{
-              background: MF.card, border: `1px solid ${MF.border}`, borderRadius: MF.radius,
-              padding: "16px", marginBottom: "10px", opacity: 0.75,
-            }}>
-              <div style={{ display: "flex", gap: "10px" }}>
-                <div style={{
-                  width: "8px", height: "8px", borderRadius: "50%", flexShrink: 0, marginTop: "6px",
-                  background: r.riskWeight === "high" ? MF.amber : r.riskWeight === "medium" ? MF.secondary : MF.border,
-                }} />
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: "15px", fontWeight: 600, marginBottom: "4px" }}>{r.label}</div>
-                  <div style={{ fontSize: "13px", color: MF.textMuted, lineHeight: 1.5, marginBottom: "8px" }}>{r.description}</div>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span style={{ fontSize: "11px", color: MF.textMuted }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+          {shown.map((r) => {
+            const isOpen = expandedItem === r.id;
+            const win = resolveWindow(r, setup);
+            const dotColor = r.riskWeight === "high" ? MF.amber : r.riskWeight === "medium" ? MF.secondary : MF.border;
+            return (
+              <div key={r.id} style={{
+                background: MF.card, border: `1px solid ${MF.border}`,
+                borderRadius: MF.radius, overflow: "hidden",
+                animation: "slideUp 0.25s ease both",
+              }}>
+                {/* Compact row */}
+                <button
+                  onClick={() => setExpandedItem(isOpen ? null : r.id)}
+                  style={{
+                    width: "100%", display: "flex", alignItems: "center", gap: "8px",
+                    padding: "10px 12px", background: "none", border: "none",
+                    cursor: "pointer", fontFamily: MF.font, textAlign: "left",
+                  }}
+                >
+                  <div style={{
+                    width: "8px", height: "8px", borderRadius: "50%", flexShrink: 0,
+                    background: dotColor,
+                  }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: "14px", fontWeight: 600, letterSpacing: "-0.01em", color: MF.text }}>
+                      {r.label}
+                    </div>
+                    <div style={{ fontSize: "11px", color: MF.textMuted, marginTop: "1px", lineHeight: 1.3 }}>
+                      {r.roleContext}
+                    </div>
+                  </div>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={MF.textMuted} strokeWidth="2" strokeLinecap="round" style={{
+                    transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
+                    transition: "transform 0.2s ease", opacity: 0.4, flexShrink: 0,
+                  }}><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+
+                {/* Expanded detail */}
+                {isOpen && (
+                  <div style={{ padding: "0 16px 14px", animation: "fadeIn 0.15s ease" }}>
+                    <div style={{ fontSize: "13px", color: MF.textMuted, lineHeight: 1.6, marginBottom: "8px" }}>
+                      {r.description}
+                    </div>
+                    <div style={{ fontSize: "11px", color: MF.textMuted, marginBottom: "10px", fontStyle: "italic" }}>
                       Usually relevant around {fmtTime12(win.start)}
-                    </span>
+                    </div>
                     <button
                       style={btn(MF.secondary, MF.secondaryDim)}
-                      onClick={() => onAction(r.id, S.HANDLED_EARLY)}
+                      onClick={() => { onAction(r.id, S.HANDLED_EARLY); setExpandedItem(null); }}
                     >
                       Mark handled early
                     </button>
                   </div>
-                </div>
+                )}
               </div>
-            </div>
-          );
-        })
+            );
+          })}
+          {!showAll && hiddenCount > 0 && (
+            <button
+              onClick={() => setShowAll(true)}
+              style={{
+                width: "100%", padding: "10px", marginTop: "2px",
+                fontSize: "12px", fontWeight: 600, color: MF.textMuted,
+                background: "transparent", border: `1px dashed ${MF.border}`,
+                borderRadius: MF.radiusSm, cursor: "pointer", fontFamily: MF.font,
+              }}
+            >
+              {hiddenCount} more items
+            </button>
+          )}
+          {showAll && laterItems.length > MAX_SHOWN && (
+            <button
+              onClick={() => setShowAll(false)}
+              style={{
+                width: "100%", padding: "8px", marginTop: "2px",
+                fontSize: "11px", color: MF.textMuted, opacity: 0.6,
+                background: "transparent", border: "none",
+                cursor: "pointer", fontFamily: MF.font,
+              }}
+            >
+              Show less
+            </button>
+          )}
+        </div>
       )}
     </div>
   );
@@ -2579,6 +2544,8 @@ function LaterTodayScreen({ rules, itemStates, setup, ctx, onAction }) {
 
 // GET AHEAD
 function GetAheadScreen({ rules, itemStates, ctx, onAction, queueState }) {
+  const [expandedItem, setExpandedItem] = useState(null);
+
   const eligible = rules.filter((r) =>
     r.getAheadEligible && ![S.CONFIRMED, S.HANDLED_EARLY, S.NOT_APPLICABLE].includes(itemStates[r.id])
   );
@@ -2588,12 +2555,15 @@ function GetAheadScreen({ rules, itemStates, ctx, onAction, queueState }) {
   const toobusy = activeCount > 4 || ctx.timingPressure === "end-of-day" || queueState === "needsfocus" || queueState === "highdemand";
 
   return (
-    <div style={{ padding: "20px", animation: "fadeIn 0.2s ease" }}>
-      <ScreenHeader
-        title="Get ahead"
-        subtitle="Optional early opportunities. Skip anything here without guilt."
-        ctx={ctx}
-      />
+    <div style={{ padding: "16px", animation: "fadeIn 0.2s ease" }}>
+      <div style={{ fontSize: "12px", color: MF.textMuted, marginBottom: "4px" }}>
+        <span style={{ fontWeight: 600, color: MF.accent }}>Get ahead</span>
+        <span style={{ opacity: 0.4 }}> · </span>
+        <span>{fmtTime12(ctx.currentMin)}</span>
+      </div>
+      <div style={{ fontSize: "15px", fontWeight: 600, color: MF.text, letterSpacing: "-0.01em", marginBottom: "12px" }}>
+        {toobusy ? "Plenty on your plate" : eligible.length === 0 ? "Nothing to get ahead on" : `${eligible.length} optional opportunit${eligible.length === 1 ? "y" : "ies"}`}
+      </div>
 
       {toobusy ? (
         <QuietState
@@ -2603,28 +2573,62 @@ function GetAheadScreen({ rules, itemStates, ctx, onAction, queueState }) {
       ) : eligible.length === 0 ? (
         <QuietState message="Nothing to get ahead on right now." sub="You're in a good spot." />
       ) : (
-        eligible.map((r) => (
-          <div key={r.id} style={{
-            background: MF.card, border: `1px solid ${MF.border}`, borderRadius: MF.radius,
-            padding: "16px", marginBottom: "10px",
-          }}>
-            <div style={{ display: "flex", gap: "10px" }}>
-              <div style={{ width: "8px", height: "8px", borderRadius: "50%", flexShrink: 0, marginTop: "6px", background: MF.border }} />
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: "15px", fontWeight: 600, marginBottom: "4px" }}>{r.label}</div>
-                <div style={{ fontSize: "13px", color: MF.textMuted, lineHeight: 1.5, marginBottom: "10px" }}>{r.description}</div>
-                <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-                  <button style={btn(MF.accent, MF.accentDim)} onClick={() => onAction(r.id, S.HANDLED_EARLY)}>
-                    Get a head start
-                  </button>
-                  <button style={btn(MF.textMuted, "rgba(139,148,158,0.08)")} onClick={() => onAction(r.id, S.CONFIRMED)}>
-                    Dismiss for now
-                  </button>
-                </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+          {eligible.map((r) => {
+            const isOpen = expandedItem === r.id;
+            return (
+              <div key={r.id} style={{
+                background: MF.card, border: `1px solid ${MF.border}`,
+                borderRadius: MF.radius, overflow: "hidden",
+                animation: "slideUp 0.25s ease both",
+              }}>
+                {/* Compact row */}
+                <button
+                  onClick={() => setExpandedItem(isOpen ? null : r.id)}
+                  style={{
+                    width: "100%", display: "flex", alignItems: "center", gap: "8px",
+                    padding: "10px 12px", background: "none", border: "none",
+                    cursor: "pointer", fontFamily: MF.font, textAlign: "left",
+                  }}
+                >
+                  <div style={{
+                    width: "8px", height: "8px", borderRadius: "50%", flexShrink: 0,
+                    background: MF.border,
+                  }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: "14px", fontWeight: 600, letterSpacing: "-0.01em", color: MF.text }}>
+                      {r.label}
+                    </div>
+                    <div style={{ fontSize: "11px", color: MF.textMuted, marginTop: "1px", lineHeight: 1.3 }}>
+                      {r.roleContext}
+                    </div>
+                  </div>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={MF.textMuted} strokeWidth="2" strokeLinecap="round" style={{
+                    transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
+                    transition: "transform 0.2s ease", opacity: 0.4, flexShrink: 0,
+                  }}><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+
+                {/* Expanded detail */}
+                {isOpen && (
+                  <div style={{ padding: "0 16px 14px", animation: "fadeIn 0.15s ease" }}>
+                    <div style={{ fontSize: "13px", color: MF.textMuted, lineHeight: 1.6, marginBottom: "12px" }}>
+                      {r.description}
+                    </div>
+                    <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                      <button style={btn(MF.accent, MF.accentDim)} onClick={() => { onAction(r.id, S.HANDLED_EARLY); setExpandedItem(null); }}>
+                        Get a head start
+                      </button>
+                      <button style={btn(MF.textMuted, "rgba(139,148,158,0.08)")} onClick={() => { onAction(r.id, S.CONFIRMED); setExpandedItem(null); }}>
+                        Skip for today
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
-          </div>
-        ))
+            );
+          })}
+        </div>
       )}
     </div>
   );
