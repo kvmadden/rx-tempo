@@ -2316,13 +2316,16 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
                         r.riskWeight === "high" && ctx.timingPressure === "tightening" ? "Worth prioritizing." :
                         ctx.timingPressure === "early" && r.riskWeight !== "high" ? "Good one to knock out early." :
                         coveredCount > 0 && visible.length <= 2 ? "Almost there." :
+                        r.riskWeight === "medium" && ctx.timingPressure !== "tightening" ? "Good time to handle this." :
+                        coveredCount > 0 && visible.length <= 5 ? "Making good progress." :
+                        r.itemType === "compliance" ? "Keeps things running smoothly." :
                         null;
                       if (!tip) return null;
                       return <div style={{ fontSize: "11px", color: MF.accent, marginBottom: "10px", fontStyle: "italic" }}>{tip}</div>;
                     })()}
                     {isEscalated && (
                       <span style={{ ...badge(MF.amber, MF.amberDim), display: "inline-block", marginBottom: "10px" }}>
-                        Entering a tighter window
+                        Window is tightening
                       </span>
                     )}
                     <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
@@ -2675,7 +2678,7 @@ function getHandoffScenario(setup) {
     arrivalType = "solo-open";
     arrivalLabel = "Starting fresh";
     arrivalHeadline = (n) => n === 0 ? "Opening up. You've got it from here." : `${n} things to check as you open.`;
-    arrivalEmpty = { message: "You're opening solo today.", sub: "No handoff needed — check Home for your board." };
+    arrivalEmpty = { message: "You're opening solo today.", sub: "Head to Home to start your board." };
   } else if (isOpener && hasOverlap) {
     arrivalType = "opener-with-relief";
     arrivalLabel = "Opening";
@@ -2780,7 +2783,7 @@ function ArrivalScreen({ rules, itemStates, ctx, onAction, setup }) {
         <div style={{ fontSize: "15px", fontWeight: 600, color: MF.text, marginBottom: "12px" }}>
           You're covering the full day.
         </div>
-        <QuietState message="No handoff needed." sub="Check Home for your board." />
+        <QuietState message="No handoff needed." sub="Head to Home to start your board." />
       </div>
     );
   }
@@ -3082,7 +3085,7 @@ function GetAheadScreen({ rules, itemStates, ctx, onAction, queueState }) {
       {toobusy ? (
         <QuietState
           message="Plenty on your plate already."
-          sub="Being present with patients matters more right now."
+          sub="Focus on what's in front of you first."
         />
       ) : eligible.length === 0 ? (
         <QuietState message="Nothing to get ahead on right now." sub="You're in a good spot." />
@@ -4005,12 +4008,15 @@ function RxTempoApp() {
   }
 
   // MAIN APP SHELL
-  const screens = {
-    home: <HomeScreen rules={activeRules} itemStates={itemStates} ctx={ctx} setup={setup} onAction={handleAction} onNav={setScreen} eventArrivals={eventArrivals} onEventArrival={(key, min) => setEventArrivals((prev) => ({ ...prev, [key]: min }))} queueState={queueState} onQueueState={setQueueState} vaccineCount={vaccineCount} onVaccine={setVaccineCount} dayNoteStates={dayNoteStates} onDayNoteState={(idx, state) => setDayNoteStates((prev) => ({ ...prev, [idx]: state }))} dayNoteConfirm={dayNoteConfirm} onDayNoteConfirm={setDayNoteConfirm} checkConfirmedAt={checkConfirmedAt} />,
-    arrival: <ArrivalScreen rules={activeRules} itemStates={itemStates} ctx={ctx} onAction={handleActionAndReturn} setup={setup} />,
-    later: <LaterTodayScreen rules={activeRules} itemStates={itemStates} setup={setup} ctx={ctx} onAction={handleAction} />,
-    ahead: <GetAheadScreen rules={activeRules} itemStates={itemStates} ctx={ctx} onAction={handleAction} queueState={queueState} />,
-    exit: <ExitScreen rules={activeRules} itemStates={itemStates} ctx={ctx} setup={setup} onAction={handleActionAndReturn} vaccineCount={vaccineCount} />,
+  const renderScreen = () => {
+    switch (screen) {
+      case "home": return <HomeScreen rules={activeRules} itemStates={itemStates} ctx={ctx} setup={setup} onAction={handleAction} onNav={setScreen} eventArrivals={eventArrivals} onEventArrival={(key, min) => setEventArrivals((prev) => ({ ...prev, [key]: min }))} queueState={queueState} onQueueState={setQueueState} vaccineCount={vaccineCount} onVaccine={setVaccineCount} dayNoteStates={dayNoteStates} onDayNoteState={(idx, state) => setDayNoteStates((prev) => ({ ...prev, [idx]: state }))} dayNoteConfirm={dayNoteConfirm} onDayNoteConfirm={setDayNoteConfirm} checkConfirmedAt={checkConfirmedAt} />;
+      case "arrival": return <ArrivalScreen rules={activeRules} itemStates={itemStates} ctx={ctx} onAction={handleActionAndReturn} setup={setup} />;
+      case "later": return <LaterTodayScreen rules={activeRules} itemStates={itemStates} setup={setup} ctx={ctx} onAction={handleAction} />;
+      case "ahead": return <GetAheadScreen rules={activeRules} itemStates={itemStates} ctx={ctx} onAction={handleAction} queueState={queueState} />;
+      case "exit": return <ExitScreen rules={activeRules} itemStates={itemStates} ctx={ctx} setup={setup} onAction={handleActionAndReturn} vaccineCount={vaccineCount} />;
+      default: return null;
+    }
   };
 
   const handoffScenario = getHandoffScenario(setup);
@@ -4133,7 +4139,7 @@ function RxTempoApp() {
 
       {/* ── CONTENT ── */}
       <main key={screen} style={{ flex: 1, overflowY: "auto", paddingBottom: "80px", animation: "fadeIn 0.2s ease" }}>
-        {screens[screen]}
+        {renderScreen()}
       </main>
 
       {/* ── BOTTOM NAV ── */}
