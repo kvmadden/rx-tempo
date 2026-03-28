@@ -430,12 +430,14 @@ function resolveWindow(rule, setup) {
   return { start, end };
 }
 
-function computeItemStates(rules, prevStates, setup, ctx) {
+function computeItemStates(rules, prevStates, setup, ctx, queueState) {
   const result = {};
   const prevActive = Object.values(prevStates).filter(
     (s) => s === S.VISIBLE || s === S.NEEDS_ATTENTION || s === S.VISIBLE_HANDOFF
   ).length;
-  const highPressure = prevActive > 5 || ctx.timingPressure === "end-of-day";
+  const q = queueState || "ontrack";
+  const highPressure = prevActive > 5 || ctx.timingPressure === "end-of-day" || q === "highdemand";
+  const needsFocus = q === "needsfocus" || q === "highdemand";
 
   // ShiftType filtering: suppress categories that don't match the shift posture
   const shiftType = setup.shiftType || "open-close";
@@ -474,8 +476,14 @@ function computeItemStates(rules, prevStates, setup, ctx) {
     const win = resolveWindow(rule, setup);
     const inWin = isTimeInRange(ctx.currentMin, win.start, win.end);
 
-    // Get Ahead: suppress under pressure
-    if (rule.category === "getahead" && highPressure) {
+    // Get Ahead: suppress under pressure or when queues need focus
+    if (rule.category === "getahead" && (highPressure || needsFocus)) {
+      result[rule.id] = S.HIDDEN;
+      continue;
+    }
+
+    // High demand: suppress low-risk items entirely
+    if (q === "highdemand" && rule.riskWeight === "low") {
       result[rule.id] = S.HIDDEN;
       continue;
     }
@@ -3174,8 +3182,8 @@ export default function RxTempo() {
   // Recompute item states
   useEffect(() => {
     if (!ctx || !setup) return;
-    setItemStates((prev) => computeItemStates(activeRules, prev, setup, ctx));
-  }, [ctx, setup, activeRules]);
+    setItemStates((prev) => computeItemStates(activeRules, prev, setup, ctx, queueState));
+  }, [ctx, setup, activeRules, queueState]);
 
   const handleAction = useCallback((ruleId, newState) => {
     setItemStates((prev) => ({ ...prev, [ruleId]: newState }));
