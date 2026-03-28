@@ -1571,7 +1571,7 @@ function StartDayScreen({ onComplete }) {
                   color: canProceed ? "#fff" : MF.textMuted,
                   border: "none", borderRadius: MF.radiusSm, padding: "14px 24px",
                   fontSize: "15px", fontWeight: 600, fontFamily: MF.font,
-                  cursor: canProceed ? "pointer" : "pointer",
+                  cursor: canProceed ? "pointer" : "not-allowed",
                   flex: 2, letterSpacing: "-0.01em",
                   opacity: canProceed ? 1 : 0.5,
                 }}
@@ -1621,8 +1621,16 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
     [S.CONFIRMED, S.HANDLED_EARLY].includes(itemStates[r.id])
   );
 
-  // Total actionable items (not get-ahead, not N/A)
-  const totalActionable = rules.filter((r) => r.category !== "getahead").length;
+  // Total actionable items (not get-ahead, not shift-suppressed)
+  const shiftType = setup.shiftType || "open-close";
+  const suppressOpening = shiftType === "mid" || shiftType === "mid-close" || shiftType === "overnight";
+  const suppressDeadline = shiftType === "open-mid";
+  const totalActionable = rules.filter((r) => {
+    if (r.category === "getahead") return false;
+    if (suppressOpening && r.category === "opening") return false;
+    if (suppressDeadline && (r.category === "deadline" || r.category === "exit")) return false;
+    return true;
+  }).length;
   const coveredCount = confirmed.length;
   const completionPct = totalActionable > 0 ? (coveredCount / totalActionable) * 100 : 0;
 
@@ -1653,8 +1661,12 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
     if ([S.VISIBLE, S.VISIBLE_HANDOFF, S.NEEDS_ATTENTION].includes(itemStates[r.id])) return false;
     if (itemStates[r.id] !== S.HIDDEN) return false;
     const win = resolveWindow(r, setup);
-    // Window has ended and is in the past
-    return win.end < ctx.currentMin && win.end > 0;
+    // Window has ended — overnight-safe: check that we're past the end but not before the start
+    if (win.end >= win.start) {
+      return ctx.currentMin > win.end;
+    }
+    // Overnight window (wraps midnight): ended if past end AND past midnight
+    return ctx.currentMin > win.end && ctx.currentMin < win.start;
   });
 
   const pacingLine = getPacingLine(ctx, visible.length, ctx.coverageMode, queueState, coveredCount, totalActionable);
@@ -2006,38 +2018,55 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
         );
       })()}
 
-      {/* Still open — expanded from chip */}
+      {/* Still open — expanded from chip, compact expandable rows */}
       {showStillOpen && stillOpen.length > 0 && (
-        <div style={{ marginTop: "12px", animation: "fadeIn 0.15s ease" }}>
-          {stillOpen.map((r) => (
-            <div key={r.id} style={{
-              background: MF.card, border: `1px solid ${MF.border}`,
-              borderLeft: `3px solid ${MF.amber}`,
-              borderRadius: MF.radius, padding: "14px 16px", marginBottom: "6px",
-            }}>
-              <div style={{ display: "flex", gap: "10px" }}>
-                <div style={{
-                  width: "8px", height: "8px", borderRadius: "50%", flexShrink: 0, marginTop: "6px",
-                  background: r.riskWeight === "high" ? MF.amber : MF.secondary,
-                }} />
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: "14px", fontWeight: 600, marginBottom: "4px" }}>{r.label}</div>
-                  <div style={{ fontSize: "12px", color: MF.textMuted, lineHeight: 1.5, marginBottom: "10px" }}>{r.description}</div>
-                  <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-                    <button style={btn(MF.green, MF.greenDim)} onClick={() => onAction(r.id, S.CONFIRMED)}>
-                      Already handled
-                    </button>
-                    <button style={btn(MF.amber, MF.amberDim)} onClick={() => onAction(r.id, S.NEEDS_ATTENTION)}>
-                      Still needs attention
-                    </button>
-                    <button style={btn(MF.textMuted, "rgba(139,148,158,0.08)")} onClick={() => onAction(r.id, S.NOT_APPLICABLE)}>
-                      Skip for today
-                    </button>
+        <div style={{ marginTop: "12px", display: "flex", flexDirection: "column", gap: "4px", animation: "fadeIn 0.15s ease" }}>
+          {stillOpen.map((r) => {
+            const isOpen = expandedItem === `still-${r.id}`;
+            const dotColor = r.riskWeight === "high" ? MF.amber : r.riskWeight === "medium" ? MF.secondary : MF.border;
+            return (
+              <div key={r.id} style={{
+                background: MF.card, border: `1px solid ${MF.border}`,
+                borderLeft: `3px solid ${MF.amber}`,
+                borderRadius: MF.radius, overflow: "hidden",
+              }}>
+                <button
+                  onClick={() => setExpandedItem(isOpen ? null : `still-${r.id}`)}
+                  style={{
+                    width: "100%", display: "flex", alignItems: "center", gap: "8px",
+                    padding: "10px 12px", background: "none", border: "none",
+                    cursor: "pointer", fontFamily: MF.font, textAlign: "left",
+                  }}
+                >
+                  <div style={{ width: "8px", height: "8px", borderRadius: "50%", flexShrink: 0, background: dotColor }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: "14px", fontWeight: 600, color: MF.text }}>{r.label}</div>
+                    <div style={{ fontSize: "11px", color: MF.textMuted, marginTop: "1px", lineHeight: 1.3 }}>{r.roleContext}</div>
                   </div>
-                </div>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={MF.textMuted} strokeWidth="2" strokeLinecap="round" style={{
+                    transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
+                    transition: "transform 0.2s ease", opacity: 0.4, flexShrink: 0,
+                  }}><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+                {isOpen && (
+                  <div style={{ padding: "0 16px 14px", animation: "fadeIn 0.15s ease" }}>
+                    <div style={{ fontSize: "13px", color: MF.textMuted, lineHeight: 1.6, marginBottom: "12px" }}>{r.description}</div>
+                    <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                      <button style={btn(MF.green, MF.greenDim)} onClick={() => { onAction(r.id, S.CONFIRMED); setExpandedItem(null); }}>
+                        Already handled
+                      </button>
+                      <button style={btn(MF.amber, MF.amberDim)} onClick={() => { onAction(r.id, S.NEEDS_ATTENTION); setExpandedItem(null); }}>
+                        Still needs attention
+                      </button>
+                      <button style={btn(MF.textMuted, "rgba(139,148,158,0.08)")} onClick={() => { onAction(r.id, S.NOT_APPLICABLE); setExpandedItem(null); }}>
+                        Skip for today
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -2619,7 +2648,7 @@ function GetAheadScreen({ rules, itemStates, ctx, onAction, queueState }) {
                       <button style={btn(MF.accent, MF.accentDim)} onClick={() => { onAction(r.id, S.HANDLED_EARLY); setExpandedItem(null); }}>
                         Get a head start
                       </button>
-                      <button style={btn(MF.textMuted, "rgba(139,148,158,0.08)")} onClick={() => { onAction(r.id, S.CONFIRMED); setExpandedItem(null); }}>
+                      <button style={btn(MF.textMuted, "rgba(139,148,158,0.08)")} onClick={() => { onAction(r.id, S.NOT_APPLICABLE); setExpandedItem(null); }}>
                         Skip for today
                       </button>
                     </div>
@@ -2655,7 +2684,10 @@ function ExitScreen({ rules, itemStates, ctx, setup, onAction, vaccineCount }) {
     if ([S.VISIBLE, S.VISIBLE_HANDOFF, S.NEEDS_ATTENTION].includes(itemStates[r.id])) return false;
     if (itemStates[r.id] !== S.HIDDEN) return false;
     const win = resolveWindow(r, setup);
-    return win.end < ctx.currentMin && win.end > 0;
+    if (win.end >= win.start) {
+      return ctx.currentMin > win.end;
+    }
+    return ctx.currentMin > win.end && ctx.currentMin < win.start;
   });
 
   const mentionCount = unresolved.length + stillOpenExit.length;
@@ -2825,6 +2857,7 @@ function ExitScreen({ rules, itemStates, ctx, setup, onAction, vaccineCount }) {
         <div style={{ marginTop: "8px", display: "flex", flexDirection: "column", gap: "4px" }}>
           {stillOpenExit.map((r) => {
             const isOpen = expandedItem === `passed-${r.id}`;
+            const dotColor = r.riskWeight === "high" ? MF.amber : r.riskWeight === "medium" ? MF.secondary : MF.border;
             return (
               <div key={r.id} style={{
                 background: MF.card, border: `1px solid ${MF.border}`,
@@ -2839,16 +2872,23 @@ function ExitScreen({ rules, itemStates, ctx, setup, onAction, vaccineCount }) {
                     cursor: "pointer", fontFamily: MF.font, textAlign: "left",
                   }}
                 >
-                  <div style={{ fontSize: "13px", fontWeight: 600, color: MF.text, flex: 1 }}>{r.label}</div>
+                  <div style={{ width: "8px", height: "8px", borderRadius: "50%", flexShrink: 0, background: dotColor }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: "14px", fontWeight: 600, color: MF.text }}>{r.label}</div>
+                    <div style={{ fontSize: "11px", color: MF.textMuted, marginTop: "1px", lineHeight: 1.3 }}>{r.roleContext}</div>
+                  </div>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={MF.textMuted} strokeWidth="2" strokeLinecap="round" style={{
                     transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
-                    transition: "transform 0.2s ease", opacity: 0.4,
+                    transition: "transform 0.2s ease", opacity: 0.4, flexShrink: 0,
                   }}><polyline points="6 9 12 15 18 9"/></svg>
                 </button>
                 {isOpen && (
-                  <div style={{ padding: "0 12px 10px", display: "flex", gap: "6px" }}>
-                    <button style={btn(MF.green, MF.greenDim)} onClick={() => { onAction(r.id, S.CONFIRMED); setExpandedItem(null); }}>Handled</button>
-                    <button style={btn(MF.textMuted, "rgba(139,148,158,0.08)")} onClick={() => { onAction(r.id, S.NOT_APPLICABLE); setExpandedItem(null); }}>Skip</button>
+                  <div style={{ padding: "0 16px 14px", animation: "fadeIn 0.15s ease" }}>
+                    <div style={{ fontSize: "13px", color: MF.textMuted, lineHeight: 1.6, marginBottom: "12px" }}>{r.description}</div>
+                    <div style={{ display: "flex", gap: "6px" }}>
+                      <button style={btn(MF.green, MF.greenDim)} onClick={() => { onAction(r.id, S.CONFIRMED); setExpandedItem(null); }}>Handled</button>
+                      <button style={btn(MF.textMuted, "rgba(139,148,158,0.08)")} onClick={() => { onAction(r.id, S.NOT_APPLICABLE); setExpandedItem(null); }}>Skip</button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -3489,12 +3529,6 @@ export default function RxTempo() {
       {/* ── CONTENT ── */}
       <div key={screen} style={{ flex: 1, overflowY: "auto", paddingBottom: "80px", animation: "fadeIn 0.2s ease" }}>
         {screens[screen]}
-      </div>
-
-      {/* ── FOOTER ── */}
-      <div style={{ textAlign: "center", padding: "12px", fontSize: "11px", color: MF.textMuted, opacity: 0.4 }}>
-        <div>© 2026 Madden Frameworks</div>
-        <div style={{ fontStyle: "italic", marginTop: "2px" }}>Smart systems. Better judgment.</div>
       </div>
 
       {/* ── BOTTOM NAV ── */}
