@@ -3555,6 +3555,9 @@ function RxTempoApp() {
   MF = { ...THEMES[theme], font: "'IBM Plex Sans', -apple-system, sans-serif", radius: "12px", radiusSm: "8px" };
   const toggleTheme = useCallback(() => setTheme((t) => t === "dark" ? "light" : "dark"), []);
 
+  // Reset scroll position when switching screens
+  useEffect(() => { window.scrollTo(0, 0); }, [screen]);
+
   // Tick every 30s (real time)
   useEffect(() => {
     const iv = setInterval(() => setNow(new Date()), TICK_INTERVAL_MS);
