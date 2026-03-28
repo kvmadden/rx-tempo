@@ -92,7 +92,7 @@ const RULES = [
     roleContext: "Patients planned around this — be ready.",
     carryLogic: "carry",
     handoffEligibility: "arrival",
-    getAheadEligible: true,
+    getAheadEligible: false,
     riskWeight: "medium",
   },
   {
@@ -131,7 +131,7 @@ const RULES = [
     roleContext: "Real impact on patient outcomes.",
     carryLogic: "carry",
     handoffEligibility: "exit",
-    getAheadEligible: true,
+    getAheadEligible: false,
     riskWeight: "medium",
   },
   {
