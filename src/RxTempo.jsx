@@ -1887,9 +1887,8 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
   const showEncouragement = guidanceLevel === "more" || guidanceLevel === "full";
   const showSummary = guidanceLevel === "full";
 
-  // Streak detection — 3+ confirms within 15 minutes
-  const recentConfirms = confirmTimestamps.filter((t) => Date.now() - t < STREAK_WINDOW_MS);
-  const onAStreak = showEncouragement && recentConfirms.length >= 3;
+  // Streak detection — 3+ confirms within 15 minutes (uses confirmTimestamps length as proxy for staleness)
+  const onAStreak = showEncouragement && confirmTimestamps.filter((t) => Date.now() - t < STREAK_WINDOW_MS).length >= 3;
 
   useEffect(() => () => { if (confirmTimerRef.current) clearTimeout(confirmTimerRef.current); }, []);
 
@@ -2740,14 +2739,16 @@ function ArrivalScreen({ rules, itemStates, ctx, onAction, setup }) {
     timerRef.current = setTimeout(() => { onAction(ruleId, state); setExpandedItem(null); setJustConfirmed(null); timerRef.current = null; }, CONFIRM_FLASH_MS);
   };
   const scenario = getHandoffScenario(setup);
-  const items = rules.filter((r) =>
-    r.handoffEligibility === "arrival" &&
-    [S.VISIBLE, S.VISIBLE_HANDOFF, S.NEEDS_ATTENTION].includes(itemStates[r.id])
-  );
-  const handled = rules.filter((r) =>
-    r.handoffEligibility === "arrival" &&
-    [S.CONFIRMED, S.HANDLED_EARLY].includes(itemStates[r.id])
-  );
+  const { items, handled } = useMemo(() => ({
+    items: rules.filter((r) =>
+      r.handoffEligibility === "arrival" &&
+      [S.VISIBLE, S.VISIBLE_HANDOFF, S.NEEDS_ATTENTION].includes(itemStates[r.id])
+    ),
+    handled: rules.filter((r) =>
+      r.handoffEligibility === "arrival" &&
+      [S.CONFIRMED, S.HANDLED_EARLY].includes(itemStates[r.id])
+    ),
+  }), [rules, itemStates]);
 
   // Solo shift — no arrival handoff
   if (scenario.isSolo) {
@@ -2902,15 +2903,14 @@ function LaterTodayScreen({ rules, itemStates, setup, ctx, onAction }) {
   };
   const MAX_SHOWN = 5;
 
-  const laterItems = rules.filter((r) => {
+  const laterItems = useMemo(() => rules.filter((r) => {
     if ([S.CONFIRMED, S.HANDLED_EARLY, S.NOT_APPLICABLE].includes(itemStates[r.id])) return false;
     if (r.category === "getahead") return false;
     if ([S.VISIBLE, S.VISIBLE_HANDOFF, S.NEEDS_ATTENTION].includes(itemStates[r.id])) return false;
     if (itemStates[r.id] !== S.HIDDEN) return false;
-    // Only show if the window is still ahead of us
     const win = resolveWindow(r, setup);
     return win.start > ctx.currentMin;
-  });
+  }), [rules, itemStates, setup, ctx.currentMin]);
 
   const shown = showAll ? laterItems : laterItems.slice(0, MAX_SHOWN);
   const hiddenCount = laterItems.length - MAX_SHOWN;
@@ -3038,12 +3038,14 @@ function GetAheadScreen({ rules, itemStates, ctx, onAction, queueState }) {
     timerRef.current = setTimeout(() => { onAction(ruleId, state); setExpandedItem(null); setJustConfirmed(null); timerRef.current = null; }, CONFIRM_FLASH_MS);
   };
 
-  const eligible = rules.filter((r) =>
-    r.getAheadEligible && ![S.CONFIRMED, S.HANDLED_EARLY, S.NOT_APPLICABLE].includes(itemStates[r.id])
-  );
-  const activeCount = Object.values(itemStates).filter(
-    (s) => s === S.VISIBLE || s === S.NEEDS_ATTENTION
-  ).length;
+  const { eligible, activeCount } = useMemo(() => ({
+    eligible: rules.filter((r) =>
+      r.getAheadEligible && ![S.CONFIRMED, S.HANDLED_EARLY, S.NOT_APPLICABLE].includes(itemStates[r.id])
+    ),
+    activeCount: Object.values(itemStates).filter(
+      (s) => s === S.VISIBLE || s === S.NEEDS_ATTENTION
+    ).length,
+  }), [rules, itemStates]);
   const toobusy = activeCount > 4 || ctx.timingPressure === "end-of-day" || queueState === "needsfocus" || queueState === "highdemand";
 
   return (
@@ -3145,15 +3147,17 @@ function ExitScreen({ rules, itemStates, ctx, setup, onAction, vaccineCount }) {
   };
   const scenario = getHandoffScenario(setup);
 
-  const unresolved = rules.filter((r) =>
-    r.handoffEligibility === "exit" &&
-    [S.VISIBLE, S.VISIBLE_HANDOFF, S.NEEDS_ATTENTION].includes(itemStates[r.id])
-  );
-  const covered = rules.filter((r) =>
-    r.handoffEligibility === "exit" &&
-    [S.CONFIRMED, S.HANDLED_EARLY].includes(itemStates[r.id])
-  );
-  const stillOpenExit = getStillOpenItems(rules, itemStates, setup, ctx);
+  const { unresolved, covered, stillOpenExit } = useMemo(() => ({
+    unresolved: rules.filter((r) =>
+      r.handoffEligibility === "exit" &&
+      [S.VISIBLE, S.VISIBLE_HANDOFF, S.NEEDS_ATTENTION].includes(itemStates[r.id])
+    ),
+    covered: rules.filter((r) =>
+      r.handoffEligibility === "exit" &&
+      [S.CONFIRMED, S.HANDLED_EARLY].includes(itemStates[r.id])
+    ),
+    stillOpenExit: getStillOpenItems(rules, itemStates, setup, ctx),
+  }), [rules, itemStates, setup, ctx]);
 
   const mentionCount = unresolved.length + stillOpenExit.length;
   const showSnapshot = covered.length > 0 || mentionCount > 0 || (setup?.immTarget > 0 && vaccineCount > 0);
