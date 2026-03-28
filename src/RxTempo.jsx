@@ -1705,7 +1705,7 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
   const highPressure = visible.length > 5 || queueState === "highdemand";
 
   return (
-    <div style={{ padding: "16px", animation: "fadeIn 0.2s ease" }}>
+    <div style={{ padding: "12px 16px", animation: "fadeIn 0.2s ease" }}>
       {/* Phase header — compact single line */}
       <div style={{ marginBottom: "8px" }}>
         <div style={{ fontSize: "12px", color: MF.textMuted, marginBottom: "5px", display: "flex", alignItems: "baseline", gap: "4px" }}>
@@ -1799,44 +1799,23 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
         );
       })}
 
-      {/* Pressure indicator */}
-      {highPressure && (
-        <div style={{
-          background: MF.amberDim, border: `1px solid ${MF.amber}30`,
-          borderRadius: MF.radiusSm, padding: "10px 14px", marginBottom: "16px",
-          fontSize: "13px", color: MF.amber, fontWeight: 500,
-        }}>
-          {queueState === "highdemand"
-            ? "High demand — optional items hidden. Focus on what's essential."
-            : "Busy board — showing only what matters most. Optional items are hidden."}
-        </div>
-      )}
-      {queueState === "needsfocus" && !highPressure && (
-        <div style={{
-          background: MF.secondaryDim, border: `1px solid ${MF.secondary}30`,
-          borderRadius: MF.radiusSm, padding: "10px 14px", marginBottom: "16px",
-          fontSize: "13px", color: MF.secondary, fontWeight: 500,
-        }}>
-          Queues need focus. Let's protect the rest of the day.
-        </div>
-      )}
-
-      {/* Pacing line */}
-      <div style={{ fontSize: "15px", fontWeight: 600, letterSpacing: "-0.02em", marginBottom: "12px" }}>
+      {/* Status line — pacing + pressure combined */}
+      <div style={{ fontSize: "13px", color: MF.text, fontWeight: 500, marginBottom: "8px", lineHeight: 1.4 }}>
         {pacingLine}
+        {highPressure && (
+          <span style={{ color: MF.amber, marginLeft: "6px", fontSize: "12px", fontWeight: 400 }}>
+            {queueState === "highdemand" ? "· Optional items hidden" : "· Focus mode"}
+          </span>
+        )}
+        {queueState === "needsfocus" && !highPressure && (
+          <span style={{ color: MF.secondary, marginLeft: "6px", fontSize: "12px", fontWeight: 400 }}>
+            · Queues need focus
+          </span>
+        )}
       </div>
 
       {/* Visible items — compact rows with expand */}
-      {visible.length === 0 ? (
-        <QuietState
-          message={queueState === "highdemand" ? "Focus on the patient in front of you." : "Nothing pressing right now."}
-          sub={queueState === "highdemand" ? "We'll stay out of the way." :
-               queueState === "clear" ? "Focus on the patient in front of you." :
-               ctx.timingPressure === "early" ? "You're settling in." :
-               ctx.timingPressure === "tightening" ? "Window is tightening, but you're in good shape." :
-               "You're in a steady window."}
-        />
-      ) : (
+      {visible.length > 0 && (
         <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
           {visible.map((r) => {
             const isOpen = expandedItem === r.id;
@@ -1936,8 +1915,7 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
 
         return (
           <div style={{
-            display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "16px",
-            justifyContent: "center",
+            display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "10px",
           }}>
             {laterCount > 0 && (
               <button onClick={() => onNav("later")} style={{
