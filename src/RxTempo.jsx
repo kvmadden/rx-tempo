@@ -441,7 +441,7 @@ function deriveContext(setup, now) {
   } else {
     minutesIntoStore = currentMin >= storeOpen ? currentMin - storeOpen : 1440 - storeOpen + currentMin;
   }
-  const dayPosition = Math.max(0, Math.min(1, minutesIntoStore / storeLen));
+
 
   // Coverage mode + handoff detection
   let coverageMode = "solo";
@@ -802,6 +802,36 @@ const badge = (color, bg) => ({
   letterSpacing: "0.02em",
 });
 
+// ─── SHARED ITEM HELPERS ───
+const isComplianceItem = (r) => (r.itemType || "task") === "compliance";
+const isCheckItem = (r) => (r.itemType || "task") === "check";
+const getDotColor = (r, isComp) => isComp ? MF.compliance : r.riskWeight === "high" ? MF.amber : r.riskWeight === "medium" ? MF.secondary : MF.border;
+
+const ExpandChevron = ({ isOpen }) => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={MF.textMuted} strokeWidth="2" strokeLinecap="round" style={{
+    transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
+    transition: "transform 0.2s ease", opacity: 0.4, flexShrink: 0,
+  }}><polyline points="6 9 12 15 18 9"/></svg>
+);
+
+const RequiredBadge = () => (
+  <span style={{
+    fontSize: "9px", fontWeight: 700, letterSpacing: "0.05em",
+    color: MF.compliance, padding: "2px 6px", borderRadius: "4px",
+    border: `1px solid ${MF.compliance}40`, background: MF.complianceDim,
+  }}>REQ</span>
+);
+
+const getStillOpenItems = (rules, itemStates, setup, ctx) => rules.filter((r) => {
+  if (r.category === "getahead") return false;
+  if ([S.CONFIRMED, S.HANDLED_EARLY, S.NOT_APPLICABLE].includes(itemStates[r.id])) return false;
+  if ([S.VISIBLE, S.VISIBLE_HANDOFF, S.NEEDS_ATTENTION].includes(itemStates[r.id])) return false;
+  if (itemStates[r.id] !== S.HIDDEN) return false;
+  const win = resolveWindow(r, setup);
+  if (win.end >= win.start) return ctx.currentMin > win.end;
+  return ctx.currentMin > win.end && ctx.currentMin < win.start;
+});
+
 // Brand component — single line: RxTempo Lite + MADDEN FRAMEWORKS
 function Brand({ size = 17, compact = false, dim = false }) {
   const opacity = dim ? 0.4 : 1;
@@ -1114,8 +1144,10 @@ function StartDayScreen({ onComplete }) {
   const [storeClose, setStoreClose] = useState(toMin(21, 0));
   const [is24hrToggle, setIs24hrToggle] = useState(false);
   const [hasOverlap, setHasOverlap] = useState("no");
-  const [overlapWindows, setOverlapWindows] = useState([{ start: toMin(12, 0), end: toMin(17, 0) }]);
-  const [dayNotes, setDayNotes] = useState([""]);
+  const [overlapWindows, setOverlapWindows] = useState([{ id: 1, start: toMin(12, 0), end: toMin(17, 0) }]);
+  const nextWindowId = useRef(2);
+  const [dayNotes, setDayNotes] = useState([{ id: 1, text: "" }]);
+  const nextNoteId = useRef(2);
   // Today's events — smart defaults based on day of week
   const today = new Date().getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
   const dayName = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][today];
@@ -1140,7 +1172,7 @@ function StartDayScreen({ onComplete }) {
     storeOpen: +storeOpen,
     storeClose: +storeClose,
     overlapWindows: hasOverlap === "yes" ? overlapWindows.map((w) => ({ start: +w.start, end: +w.end })) : [],
-    dayNotes: dayNotes.map((n) => n.trim()).filter(Boolean),
+    dayNotes: dayNotes.map((n) => n.text.trim()).filter(Boolean),
     expectedEvents: {
       warehouse: hasWarehouse === "yes",
       ov: hasOV === "yes",
@@ -1169,7 +1201,7 @@ function StartDayScreen({ onComplete }) {
           const events = [
             ...(hasWarehouse === "yes" ? ["Warehouse delivery"] : []),
           ];
-          const trimmedNotes = dayNotes.filter((n) => n.trim());
+          const trimmedNotes = dayNotes.filter((n) => n.text.trim());
           const rows = [
             ["Role", ROLE_LABELS[role]],
             ["Shift type", SHIFT_TYPE_LABELS[shiftType]],
@@ -1479,7 +1511,7 @@ function StartDayScreen({ onComplete }) {
                 let wStart = s + 120;
                 if (!isOvernight && wStart >= e) wStart = Math.max(s, e - 60);
                 if (isOvernight) wStart = wStart % 1440;
-                setOverlapWindows((prev) => [...prev, { start: wStart, end: e }]);
+                setOverlapWindows((prev) => [...prev, { id: nextWindowId.current++, start: wStart, end: e }]);
               };
               const removeWindow = (idx) => {
                 setOverlapWindows((prev) => prev.filter((_, i) => i !== idx));
@@ -1487,7 +1519,7 @@ function StartDayScreen({ onComplete }) {
               return (
                 <div style={{ marginBottom: "16px" }}>
                   {overlapWindows.map((w, idx) => (
-                    <div key={idx} style={{
+                    <div key={w.id} style={{
                       background: MF.accentDim, border: `1px solid ${MF.accentMid}`,
                       borderRadius: MF.radius, padding: "14px", marginBottom: "8px",
                     }}>
@@ -1705,13 +1737,13 @@ function StartDayScreen({ onComplete }) {
                 Notes for today <span style={{ opacity: 0.5, fontWeight: 400, textTransform: "none" }}>(optional)</span>
               </label>
               {dayNotes.map((note, idx) => (
-                <div key={idx} style={{ display: "flex", gap: "8px", marginBottom: "8px" }}>
+                <div key={note.id} style={{ display: "flex", gap: "8px", marginBottom: "8px" }}>
                   <input
                     type="text"
-                    value={note}
+                    value={note.text}
                     onChange={(e) => {
                       const updated = [...dayNotes];
-                      updated[idx] = e.target.value;
+                      updated[idx] = { ...updated[idx], text: e.target.value };
                       setDayNotes(updated);
                     }}
                     placeholder={idx === 0 ? "e.g. Supervisor visit at 11am, Call at 1pm..." : "Another note..."}
@@ -1736,7 +1768,7 @@ function StartDayScreen({ onComplete }) {
               ))}
               {dayNotes.length < 5 && (
                 <button
-                  onClick={() => setDayNotes([...dayNotes, ""])}
+                  onClick={() => setDayNotes([...dayNotes, { id: nextNoteId.current++, text: "" }])}
                   style={{
                     background: "none", border: `1px dashed ${MF.border}`, borderRadius: MF.radiusSm,
                     padding: "10px", width: "100%", cursor: "pointer", fontFamily: MF.font,
@@ -1859,22 +1891,10 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
   };
 
   // Items whose window has passed without being actioned
-  const stillOpen = rules.filter((r) => {
-    if (r.category === "getahead") return false;
-    if ([S.CONFIRMED, S.HANDLED_EARLY, S.NOT_APPLICABLE].includes(itemStates[r.id])) return false;
-    if ([S.VISIBLE, S.VISIBLE_HANDOFF, S.NEEDS_ATTENTION].includes(itemStates[r.id])) return false;
-    if (itemStates[r.id] !== S.HIDDEN) return false;
-    const win = resolveWindow(r, setup);
-    // Window has ended — overnight-safe: check that we're past the end but not before the start
-    if (win.end >= win.start) {
-      return ctx.currentMin > win.end;
-    }
-    // Overnight window (wraps midnight): ended if past end AND past midnight
-    return ctx.currentMin > win.end && ctx.currentMin < win.start;
-  });
+  const stillOpen = getStillOpenItems(rules, itemStates, setup, ctx);
 
-  const visibleTasks = visible.filter((r) => { const t = r.itemType || "task"; return t === "task" || t === "compliance"; }).length;
-  const visibleChecks = visible.filter((r) => (r.itemType || "task") === "check").length;
+  const visibleTasks = visible.filter((r) => !isCheckItem(r)).length;
+  const visibleChecks = visible.filter(isCheckItem).length;
   const pacingLine = getPacingLine(ctx, visible.length, ctx.coverageMode, queueState, coveredCount, totalActionable, visibleTasks, visibleChecks);
   const phaseLabel = getPhaseLabel(ctx);
   const highPressure = visible.length > 5 || queueState === "highdemand" || queueState === "needsfocus";
@@ -2041,14 +2061,14 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
         return (
         <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
           {shown.map((r) => {
-            const isCheck = (r.itemType || "task") === "check";
+            const isCheck = isCheckItem(r);
             const isOpen = expandedItem === r.id;
             const st = itemStates[r.id];
             const isAttention = st === S.NEEDS_ATTENTION;
             const isHandoff = st === S.VISIBLE_HANDOFF;
             const isEscalated = isAttention && r.riskWeight === "high" &&
               (ctx.timingPressure === "tightening" || ctx.timingPressure === "end-of-day");
-            const dotColor = r.riskWeight === "high" ? MF.amber : r.riskWeight === "medium" ? MF.secondary : MF.border;
+            const dotColor = getDotColor(r, false);
             const isConfirming = justConfirmed === r.id;
             // Resurfaced check: was confirmed earlier but pressure escalated
             const resurfaced = isCheck && checkConfirmedAt && checkConfirmedAt[r.id] !== undefined;
@@ -2059,7 +2079,7 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
                 <div key={r.id} style={{
                   background: isConfirming ? MF.greenDim : MF.card,
                   border: `1px solid ${isConfirming ? MF.green + "60" : MF.border}`,
-                  transition: "all 0.3s ease",
+                  transition: "background 0.3s ease, border-color 0.3s ease, transform 0.3s ease, opacity 0.3s ease",
                   transform: isConfirming ? "scale(0.98)" : "scale(1)",
                   opacity: isConfirming ? 0.85 : 1,
                   borderRadius: MF.radiusSm,
@@ -2104,7 +2124,7 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
             }
 
             // ── COMPLIANCE ROW: required items, friction on skip ──
-            const isCompliance = (r.itemType || "task") === "compliance";
+            const isCompliance = isComplianceItem(r);
             if (isCompliance) {
               const isOpen = expandedItem === r.id;
               const isSkipConfirming = confirmSkipCompliance === r.id;
@@ -2113,7 +2133,7 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
                   background: isConfirming ? MF.greenDim : MF.card,
                   border: `1px solid ${isConfirming ? MF.green + "60" : MF.compliance + "40"}`,
                   borderLeft: `3px solid ${isConfirming ? MF.green : MF.compliance}`,
-                  transition: "all 0.3s ease",
+                  transition: "background 0.3s ease, border-color 0.3s ease, transform 0.3s ease, opacity 0.3s ease",
                   transform: isConfirming ? "scale(0.98)" : "scale(1)",
                   opacity: isConfirming ? 0.85 : 1,
                   borderRadius: MF.radius,
@@ -2148,15 +2168,8 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
                       )}
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
-                      <span style={{
-                        fontSize: "9px", fontWeight: 700, letterSpacing: "0.05em",
-                        color: MF.compliance, padding: "2px 6px", borderRadius: "4px",
-                        border: `1px solid ${MF.compliance}40`, background: MF.complianceDim,
-                      }}>REQ</span>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={MF.textMuted} strokeWidth="2" strokeLinecap="round" style={{
-                        transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
-                        transition: "transform 0.2s ease", opacity: 0.4,
-                      }}><polyline points="6 9 12 15 18 9"/></svg>
+                      <RequiredBadge />
+                      <ExpandChevron isOpen={isOpen} />
                     </div>
                   </button>
                   {isOpen && (
@@ -2216,7 +2229,7 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
                 background: isConfirming ? MF.greenDim : isEscalated ? MF.amberDim : MF.card,
                 border: `1px solid ${isConfirming ? MF.green + "60" : isEscalated ? MF.amber + "4D" : MF.border}`,
                 borderLeft: `3px solid ${isConfirming ? MF.green : leftBorder}`,
-                transition: "all 0.3s ease",
+                transition: "background 0.3s ease, border-color 0.3s ease, transform 0.3s ease, opacity 0.3s ease",
                 transform: isConfirming ? "scale(0.98)" : "scale(1)",
                 opacity: isConfirming ? 0.85 : 1,
                 borderRadius: MF.radius,
@@ -2254,10 +2267,7 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
                   <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
                     {isHandoff && <span style={badge(MF.accent, MF.accentDim)}>Handoff</span>}
                     {isAttention && !isEscalated && <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: MF.amber }} />}
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={MF.textMuted} strokeWidth="2" strokeLinecap="round" style={{
-                      transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
-                      transition: "transform 0.2s ease", opacity: 0.4,
-                    }}><polyline points="6 9 12 15 18 9"/></svg>
+                    <ExpandChevron isOpen={isOpen} />
                   </div>
                 </button>
 
@@ -2385,9 +2395,9 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
         <div style={{ marginTop: "12px", display: "flex", flexDirection: "column", gap: "4px", animation: "fadeIn 0.15s ease" }}>
           {stillOpen.map((r) => {
             const isOpen = expandedItem === `still-${r.id}`;
-            const isComp = (r.itemType || "task") === "compliance";
+            const isComp = isComplianceItem(r);
             const isSkipConfirming = confirmSkipCompliance === `still-${r.id}`;
-            const dotColor = r.riskWeight === "high" ? MF.amber : r.riskWeight === "medium" ? MF.secondary : MF.border;
+            const dotColor = getDotColor(r, false);
             return (
               <div key={r.id} style={{
                 background: MF.card,
@@ -2410,15 +2420,8 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
                       {isComp ? `Required — ${r.roleContext.charAt(0).toLowerCase() + r.roleContext.slice(1)}` : r.roleContext}
                     </div>
                   </div>
-                  {isComp && <span style={{
-                    fontSize: "9px", fontWeight: 700, letterSpacing: "0.05em",
-                    color: MF.compliance, padding: "2px 6px", borderRadius: "4px",
-                    border: `1px solid ${MF.compliance}40`, background: MF.complianceDim,
-                  }}>REQ</span>}
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={MF.textMuted} strokeWidth="2" strokeLinecap="round" style={{
-                    transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
-                    transition: "transform 0.2s ease", opacity: 0.4, flexShrink: 0,
-                  }}><polyline points="6 9 12 15 18 9"/></svg>
+                  {isComp && <RequiredBadge />}
+                  <ExpandChevron isOpen={isOpen} />
                 </button>
                 {isOpen && (
                   <div style={{ padding: "0 16px 14px", animation: "fadeIn 0.15s ease" }}>
@@ -2574,8 +2577,8 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
               {/* Progress bar */}
               <div style={{ width: "100%", height: "4px", background: MF.border, borderRadius: "2px", overflow: "hidden", marginBottom: "12px" }}>
                 <div style={{
-                  width: `${Math.min(100, (vaccineCount / setup.immTarget) * 100)}%`, height: "100%",
-                  background: vaccineCount >= setup.immTarget ? MF.green : MF.accent,
+                  width: `${Math.min(100, setup.immTarget > 0 ? (vaccineCount / setup.immTarget) * 100 : 0)}%`, height: "100%",
+                  background: setup.immTarget > 0 && vaccineCount >= setup.immTarget ? MF.green : MF.accent,
                   borderRadius: "2px", transition: "width 0.4s ease",
                 }} />
               </div>
@@ -2796,8 +2799,8 @@ function ArrivalScreen({ rules, itemStates, ctx, onAction, setup }) {
           {items.map((r) => {
             const isOpen = expandedItem === r.id;
             const isAttention = itemStates[r.id] === S.NEEDS_ATTENTION;
-            const isComp = (r.itemType || "task") === "compliance";
-            const dotColor = isComp ? MF.compliance : r.riskWeight === "high" ? MF.amber : r.riskWeight === "medium" ? MF.secondary : MF.border;
+            const isComp = isComplianceItem(r);
+            const dotColor = getDotColor(r, isComp);
 
             const isConfirming = justConfirmed === r.id;
             return (
@@ -2806,7 +2809,7 @@ function ArrivalScreen({ rules, itemStates, ctx, onAction, setup }) {
                 border: `1px solid ${isConfirming ? MF.green + "60" : isAttention ? MF.amber + "4D" : isComp ? MF.compliance + "40" : MF.border}`,
                 borderLeft: `3px solid ${isConfirming ? MF.green : isAttention ? MF.amber : isComp ? MF.compliance : MF.accentMid}`,
                 borderRadius: MF.radius, overflow: "hidden",
-                transition: "all 0.3s ease",
+                transition: "background 0.3s ease, border-color 0.3s ease, transform 0.3s ease, opacity 0.3s ease",
                 transform: isConfirming ? "scale(0.98)" : "scale(1)",
                 opacity: isConfirming ? 0.85 : 1,
               }}>
@@ -2825,12 +2828,9 @@ function ArrivalScreen({ rules, itemStates, ctx, onAction, setup }) {
                       {isComp ? `Required — ${r.roleContext.charAt(0).toLowerCase() + r.roleContext.slice(1)}` : r.roleContext}
                     </div>
                   </div>
-                  {isComp && <span style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.05em", color: MF.compliance, padding: "2px 6px", borderRadius: "4px", border: `1px solid ${MF.compliance}40`, background: MF.complianceDim }}>REQ</span>}
+                  {isComp && <RequiredBadge />}
                   {isAttention && !isComp && <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: MF.amber, flexShrink: 0 }} />}
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={MF.textMuted} strokeWidth="2" strokeLinecap="round" style={{
-                    transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
-                    transition: "transform 0.2s ease", opacity: 0.4, flexShrink: 0,
-                  }}><polyline points="6 9 12 15 18 9"/></svg>
+                  <ExpandChevron isOpen={isOpen} />
                 </button>
 
                 {isOpen && !isConfirming && (
@@ -2912,8 +2912,8 @@ function LaterTodayScreen({ rules, itemStates, setup, ctx, onAction }) {
           {shown.map((r) => {
             const isOpen = expandedItem === r.id;
             const win = resolveWindow(r, setup);
-            const isComp = (r.itemType || "task") === "compliance";
-            const dotColor = isComp ? MF.compliance : r.riskWeight === "high" ? MF.amber : r.riskWeight === "medium" ? MF.secondary : MF.border;
+            const isComp = isComplianceItem(r);
+            const dotColor = getDotColor(r, isComp);
             const isConfirming = justConfirmed === r.id;
             return (
               <div key={r.id} style={{
@@ -2922,7 +2922,7 @@ function LaterTodayScreen({ rules, itemStates, setup, ctx, onAction }) {
                 borderLeft: isComp ? `3px solid ${isConfirming ? MF.green : MF.compliance}` : undefined,
                 borderRadius: MF.radius, overflow: "hidden",
                 animation: "slideUp 0.25s ease both",
-                transition: "all 0.3s ease",
+                transition: "background 0.3s ease, border-color 0.3s ease, transform 0.3s ease, opacity 0.3s ease",
                 transform: isConfirming ? "scale(0.98)" : "scale(1)",
                 opacity: isConfirming ? 0.85 : 1,
               }}>
@@ -2948,11 +2948,8 @@ function LaterTodayScreen({ rules, itemStates, setup, ctx, onAction }) {
                       {isComp ? `Required — ${r.roleContext.charAt(0).toLowerCase() + r.roleContext.slice(1)}` : r.roleContext}
                     </div>
                   </div>
-                  {isComp && <span style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.05em", color: MF.compliance, padding: "2px 6px", borderRadius: "4px", border: `1px solid ${MF.compliance}40`, background: MF.complianceDim }}>REQ</span>}
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={MF.textMuted} strokeWidth="2" strokeLinecap="round" style={{
-                    transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
-                    transition: "transform 0.2s ease", opacity: 0.4, flexShrink: 0,
-                  }}><polyline points="6 9 12 15 18 9"/></svg>
+                  {isComp && <RequiredBadge />}
+                  <ExpandChevron isOpen={isOpen} />
                 </button>
 
                 {/* Expanded detail */}
@@ -3056,7 +3053,7 @@ function GetAheadScreen({ rules, itemStates, ctx, onAction, queueState }) {
                 border: `1px solid ${isConfirming ? MF.green + "60" : MF.border}`,
                 borderRadius: MF.radius, overflow: "hidden",
                 animation: "slideUp 0.25s ease both",
-                transition: "all 0.3s ease",
+                transition: "background 0.3s ease, border-color 0.3s ease, transform 0.3s ease, opacity 0.3s ease",
                 transform: isConfirming ? "scale(0.98)" : "scale(1)",
                 opacity: isConfirming ? 0.85 : 1,
               }}>
@@ -3082,10 +3079,7 @@ function GetAheadScreen({ rules, itemStates, ctx, onAction, queueState }) {
                       {r.roleContext}
                     </div>
                   </div>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={MF.textMuted} strokeWidth="2" strokeLinecap="round" style={{
-                    transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
-                    transition: "transform 0.2s ease", opacity: 0.4, flexShrink: 0,
-                  }}><polyline points="6 9 12 15 18 9"/></svg>
+                  <ExpandChevron isOpen={isOpen} />
                 </button>
 
                 {/* Expanded detail */}
@@ -3136,17 +3130,7 @@ function ExitScreen({ rules, itemStates, ctx, setup, onAction, vaccineCount }) {
     r.handoffEligibility === "exit" &&
     [S.CONFIRMED, S.HANDLED_EARLY].includes(itemStates[r.id])
   );
-  const stillOpenExit = rules.filter((r) => {
-    if (r.category === "getahead") return false;
-    if ([S.CONFIRMED, S.HANDLED_EARLY, S.NOT_APPLICABLE].includes(itemStates[r.id])) return false;
-    if ([S.VISIBLE, S.VISIBLE_HANDOFF, S.NEEDS_ATTENTION].includes(itemStates[r.id])) return false;
-    if (itemStates[r.id] !== S.HIDDEN) return false;
-    const win = resolveWindow(r, setup);
-    if (win.end >= win.start) {
-      return ctx.currentMin > win.end;
-    }
-    return ctx.currentMin > win.end && ctx.currentMin < win.start;
-  });
+  const stillOpenExit = getStillOpenItems(rules, itemStates, setup, ctx);
 
   const mentionCount = unresolved.length + stillOpenExit.length;
   const showSnapshot = covered.length > 0 || mentionCount > 0 || (setup?.immTarget > 0 && vaccineCount > 0);
@@ -3233,8 +3217,8 @@ function ExitScreen({ rules, itemStates, ctx, setup, onAction, vaccineCount }) {
           {unresolved.map((r) => {
             const isOpen = expandedItem === r.id;
             const isAttention = itemStates[r.id] === S.NEEDS_ATTENTION;
-            const isComp = (r.itemType || "task") === "compliance";
-            const dotColor = isComp ? MF.compliance : r.riskWeight === "high" ? MF.amber : r.riskWeight === "medium" ? MF.secondary : MF.border;
+            const isComp = isComplianceItem(r);
+            const dotColor = getDotColor(r, isComp);
 
             const isConfirming = justConfirmed === r.id;
             return (
@@ -3243,7 +3227,7 @@ function ExitScreen({ rules, itemStates, ctx, setup, onAction, vaccineCount }) {
                 border: `1px solid ${isConfirming ? MF.green + "60" : isAttention ? MF.amber + "4D" : isComp ? MF.compliance + "40" : MF.border}`,
                 borderLeft: `3px solid ${isConfirming ? MF.green : isAttention ? MF.amber : isComp ? MF.compliance : MF.accentMid}`,
                 borderRadius: MF.radius, overflow: "hidden",
-                transition: "all 0.3s ease",
+                transition: "background 0.3s ease, border-color 0.3s ease, transform 0.3s ease, opacity 0.3s ease",
                 transform: isConfirming ? "scale(0.98)" : "scale(1)",
                 opacity: isConfirming ? 0.85 : 1,
               }}>
@@ -3262,11 +3246,8 @@ function ExitScreen({ rules, itemStates, ctx, setup, onAction, vaccineCount }) {
                       {isComp ? `Required — ${r.roleContext.charAt(0).toLowerCase() + r.roleContext.slice(1)}` : r.roleContext}
                     </div>
                   </div>
-                  {isComp && <span style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.05em", color: MF.compliance, padding: "2px 6px", borderRadius: "4px", border: `1px solid ${MF.compliance}40`, background: MF.complianceDim }}>REQ</span>}
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={MF.textMuted} strokeWidth="2" strokeLinecap="round" style={{
-                    transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
-                    transition: "transform 0.2s ease", opacity: 0.4, flexShrink: 0,
-                  }}><polyline points="6 9 12 15 18 9"/></svg>
+                  {isComp && <RequiredBadge />}
+                  <ExpandChevron isOpen={isOpen} />
                 </button>
 
                 {isOpen && !isConfirming && (
@@ -3323,8 +3304,8 @@ function ExitScreen({ rules, itemStates, ctx, setup, onAction, vaccineCount }) {
         <div style={{ marginTop: "8px", display: "flex", flexDirection: "column", gap: "4px" }}>
           {stillOpenExit.map((r) => {
             const isOpen = expandedItem === `passed-${r.id}`;
-            const isComp = (r.itemType || "task") === "compliance";
-            const dotColor = isComp ? MF.compliance : r.riskWeight === "high" ? MF.amber : r.riskWeight === "medium" ? MF.secondary : MF.border;
+            const isComp = isComplianceItem(r);
+            const dotColor = getDotColor(r, isComp);
             return (
               <div key={r.id} style={{
                 background: MF.card,
@@ -3347,11 +3328,8 @@ function ExitScreen({ rules, itemStates, ctx, setup, onAction, vaccineCount }) {
                       {isComp ? `Required — ${r.roleContext.charAt(0).toLowerCase() + r.roleContext.slice(1)}` : r.roleContext}
                     </div>
                   </div>
-                  {isComp && <span style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.05em", color: MF.compliance, padding: "2px 6px", borderRadius: "4px", border: `1px solid ${MF.compliance}40`, background: MF.complianceDim }}>REQ</span>}
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={MF.textMuted} strokeWidth="2" strokeLinecap="round" style={{
-                    transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
-                    transition: "transform 0.2s ease", opacity: 0.4, flexShrink: 0,
-                  }}><polyline points="6 9 12 15 18 9"/></svg>
+                  {isComp && <RequiredBadge />}
+                  <ExpandChevron isOpen={isOpen} />
                 </button>
                 {isOpen && (
                   <div style={{ padding: "0 16px 14px", animation: "fadeIn 0.15s ease" }}>
@@ -3679,7 +3657,7 @@ export default function RxTempo() {
     ::-webkit-scrollbar { width: 3px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: ${MF.border}; border-radius: 3px; }
     button:active { transform: scale(0.97); }
     button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid ${MF.accent}; outline-offset: 2px; }
-    input[type="range"] { height: 4px; }
+    input[type="range"] { height: 28px; cursor: pointer; }
   `;
 
   // LANDING PAGE
