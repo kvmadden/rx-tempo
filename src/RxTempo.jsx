@@ -1347,37 +1347,64 @@ function StartDayScreen({ onComplete }) {
                 </div>
               );
             })()}
-            {/* Routine events — predictable schedule */}
-            <div style={{ marginBottom: "20px" }}>
-              <label style={{ fontSize: "12px", fontWeight: 600, color: MF.textMuted, marginBottom: "4px", display: "block", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                Routine events
-              </label>
-              <div style={{ fontSize: "11px", color: MF.textMuted, opacity: 0.6, marginBottom: "10px" }}>
-                Defaults for <span style={{ fontWeight: 700, color: MF.text, opacity: 1 }}>{dayName}</span>. Change if today is different.
-              </div>
-              <SelectField label="" value={hasOV} onChange={(val) => {
-                if (val === "no" && ovExpected) {
-                  setConfirmToggle({ key: "ov", label: "Outside vendor (OV)" });
-                } else {
-                  setHasOV(val);
-                }
-              }} style={{ marginBottom: "8px" }} options={[
-                { value: "no", label: "Outside vendor (OV) — No" },
-                { value: "yes", label: "Outside vendor (OV) — Yes" },
-              ]} />
-              <SelectField label="" value={hasUSPS} onChange={(val) => {
-                if (val === "no" && uspsExpected) {
-                  setConfirmToggle({ key: "usps", label: "Postal service" });
-                } else {
-                  setHasUSPS(val);
-                }
-              }} style={{ marginBottom: "0" }} options={[
-                { value: "no", label: "Postal service — No" },
-                { value: "yes", label: "Postal service — Yes" },
-              ]} />
-            </div>
+            {/* Expecting today — toggle rows */}
+            {(() => {
+              const ToggleRow = ({ label, value, onChange, defaultExpected }) => {
+                const isOn = value === "yes";
+                const handleTap = () => {
+                  // If turning off something expected for this day, confirm first
+                  if (isOn && defaultExpected) {
+                    setConfirmToggle({ key: label, label, setter: () => onChange("no") });
+                  } else {
+                    onChange(isOn ? "no" : "yes");
+                  }
+                };
+                return (
+                  <button
+                    onClick={handleTap}
+                    style={{
+                      width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+                      padding: "12px 14px", borderRadius: MF.radiusSm,
+                      border: `1px solid ${isOn ? MF.accent : MF.border}`,
+                      background: isOn ? MF.accentDim : MF.card,
+                      cursor: "pointer", fontFamily: MF.font,
+                      marginBottom: "6px", transition: "all 0.15s ease",
+                    }}
+                  >
+                    <span style={{ fontSize: "15px", fontWeight: 500, color: MF.text }}>{label}</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <span style={{ fontSize: "11px", color: MF.textMuted, opacity: 0.5 }}>tap to change</span>
+                      <span style={{
+                        fontSize: "12px", fontWeight: 700, minWidth: "38px", textAlign: "center",
+                        color: isOn ? MF.accent : MF.textMuted,
+                        padding: "3px 10px", borderRadius: "4px",
+                        border: `1px solid ${isOn ? MF.accent : MF.border}`,
+                        background: isOn ? MF.accentDim : "transparent",
+                        transition: "all 0.15s ease",
+                      }}>
+                        {isOn ? "YES" : "NO"}
+                      </span>
+                    </div>
+                  </button>
+                );
+              };
 
-            {/* Confirmation dialog */}
+              return (
+                <div style={{ marginBottom: "20px" }}>
+                  <label style={{ fontSize: "12px", fontWeight: 600, color: MF.textMuted, marginBottom: "4px", display: "block", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                    Expecting today
+                  </label>
+                  <div style={{ fontSize: "11px", color: MF.textMuted, opacity: 0.6, marginBottom: "10px" }}>
+                    Defaults for <span style={{ fontWeight: 700, color: MF.text, opacity: 1 }}>{dayName}</span>. Tap to change if today is different.
+                  </div>
+                  <ToggleRow label="Outside vendor (OV)" value={hasOV} onChange={setHasOV} defaultExpected={ovExpected} />
+                  <ToggleRow label="Postal service" value={hasUSPS} onChange={setHasUSPS} defaultExpected={uspsExpected} />
+                  <ToggleRow label="Warehouse delivery" value={hasWarehouse} onChange={setHasWarehouse} defaultExpected={false} />
+                </div>
+              );
+            })()}
+
+            {/* Confirmation dialog — turning off expected event */}
             {confirmToggle && (
               <div style={{
                 background: MF.amberDim, border: `1px solid ${MF.amber}30`,
@@ -1392,8 +1419,7 @@ function StartDayScreen({ onComplete }) {
                 <div style={{ display: "flex", gap: "8px" }}>
                   <button
                     onClick={() => {
-                      if (confirmToggle.key === "ov") setHasOV("no");
-                      else setHasUSPS("no");
+                      confirmToggle.setter();
                       setConfirmToggle(null);
                     }}
                     style={{ ...btn(MF.amber, MF.amberDim), flex: 1, padding: "10px", textAlign: "center" }}
@@ -1409,36 +1435,6 @@ function StartDayScreen({ onComplete }) {
                 </div>
               </div>
             )}
-
-            {/* Warehouse delivery — toggle */}
-            <div style={{ marginBottom: "20px" }}>
-              <label style={{ fontSize: "12px", fontWeight: 600, color: MF.textMuted, marginBottom: "10px", display: "block", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                Warehouse delivery
-              </label>
-              <button
-                onClick={() => setHasWarehouse(hasWarehouse === "yes" ? "no" : "yes")}
-                style={{
-                  width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
-                  padding: "12px 14px", borderRadius: MF.radiusSm,
-                  border: `1px solid ${hasWarehouse === "yes" ? MF.accent : MF.border}`,
-                  background: hasWarehouse === "yes" ? MF.accentDim : MF.card,
-                  cursor: "pointer", fontFamily: MF.font,
-                }}
-              >
-                <span style={{ fontSize: "15px", fontWeight: 500, color: MF.text }}>
-                  {hasWarehouse === "yes" ? "Expected today" : "Not expected"}
-                </span>
-                <span style={{
-                  fontSize: "12px", fontWeight: 700,
-                  color: hasWarehouse === "yes" ? MF.accent : MF.textMuted,
-                  padding: "2px 10px", borderRadius: "4px",
-                  border: `1px solid ${hasWarehouse === "yes" ? MF.accent : MF.border}`,
-                  background: hasWarehouse === "yes" ? MF.accentDim : "transparent",
-                }}>
-                  {hasWarehouse === "yes" ? "YES" : "NO"}
-                </span>
-              </button>
-            </div>
             <div style={{ display: "flex", gap: "10px" }}>
               <button
                 style={{ ...btn(MF.textMuted, "rgba(139,148,158,0.08)"), flex: 1, padding: "14px", textAlign: "center" }}
