@@ -1285,10 +1285,38 @@ function StartDayScreen({ onComplete }) {
 
         {step === "form2" && (
           <>
-            <SelectField label="Another pharmacist overlapping today?" value={hasOverlap} onChange={setHasOverlap} options={[
-              { value: "no", label: "No — solo today" },
-              { value: "yes", label: "Yes — overlap window" },
-            ]} />
+            <div style={{ marginBottom: "20px" }}>
+              <label style={{ fontSize: "12px", fontWeight: 600, color: MF.textMuted, marginBottom: "10px", display: "block", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                Another pharmacist overlapping?
+              </label>
+              <button
+                onClick={() => setHasOverlap(hasOverlap === "yes" ? "no" : "yes")}
+                style={{
+                  width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+                  padding: "12px 14px", borderRadius: MF.radiusSm,
+                  border: `1px solid ${hasOverlap === "yes" ? MF.accent : MF.border}`,
+                  background: hasOverlap === "yes" ? MF.accentDim : MF.card,
+                  cursor: "pointer", fontFamily: MF.font, transition: "all 0.15s ease",
+                }}
+              >
+                <span style={{ fontSize: "15px", fontWeight: 500, color: MF.text }}>
+                  {hasOverlap === "yes" ? "Yes — overlap window" : "Solo today"}
+                </span>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span style={{ fontSize: "11px", color: MF.textMuted, opacity: 0.5 }}>tap to change</span>
+                  <span style={{
+                    fontSize: "12px", fontWeight: 700, minWidth: "38px", textAlign: "center",
+                    color: hasOverlap === "yes" ? MF.accent : MF.textMuted,
+                    padding: "3px 10px", borderRadius: "4px",
+                    border: `1px solid ${hasOverlap === "yes" ? MF.accent : MF.border}`,
+                    background: hasOverlap === "yes" ? MF.accentDim : "transparent",
+                    transition: "all 0.15s ease",
+                  }}>
+                    {hasOverlap === "yes" ? "YES" : "NO"}
+                  </span>
+                </div>
+              </button>
+            </div>
             {hasOverlap === "yes" && (() => {
               // Constrain overlap times to within the shift (± a small buffer)
               const overlapTimeOptions = TIME_OPTIONS.filter((opt) => {
