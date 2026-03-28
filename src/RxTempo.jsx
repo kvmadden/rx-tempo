@@ -3533,10 +3533,17 @@ export default function RxTempo() {
 
       {/* ── BOTTOM NAV ── */}
       <div style={{
-        display: "flex", justifyContent: "space-around", padding: "8px 4px 12px",
         borderTop: `1px solid ${MF.border}`, background: MF.navBg,
         backdropFilter: "blur(12px)", position: "sticky", bottom: 0, zIndex: 100,
       }}>
+        <div style={{
+          textAlign: "center", padding: "4px 0 2px",
+          fontSize: "9px", fontWeight: 500, color: MF.textMuted, opacity: 0.35,
+          letterSpacing: "0.04em",
+        }}>
+          MADDEN FRAMEWORKS
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-around", padding: "4px 4px 12px" }}>
         {navItems.map((tab) => {
           const isActive = screen === tab.key;
           return (
@@ -3575,6 +3582,7 @@ export default function RxTempo() {
             </button>
           );
         })}
+        </div>
       </div>
     </div>
   );
