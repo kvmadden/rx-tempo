@@ -434,26 +434,16 @@ function deriveContext(setup, now) {
   const nowDate = now || new Date();
   const currentMin = nowDate.getHours() * 60 + nowDate.getMinutes();
 
-  // Shift math (overnight-safe)
-  const shiftLen = shiftEnd >= shiftStart ? shiftEnd - shiftStart : 1440 - shiftStart + shiftEnd;
-  let minutesIntoShift;
-  if (shiftEnd >= shiftStart) {
-    minutesIntoShift = currentMin - shiftStart;
-  } else {
-    minutesIntoShift = currentMin >= shiftStart ? currentMin - shiftStart : 1440 - shiftStart + currentMin;
-  }
+  // Overnight-safe time range math
+  const rangeCalc = (cur, start, end) => {
+    const len = end >= start ? end - start : 1440 - start + end;
+    const into = end >= start ? cur - start : (cur >= start ? cur - start : 1440 - start + cur);
+    return { len, into };
+  };
+
+  const { len: shiftLen, into: minutesIntoShift } = rangeCalc(currentMin, shiftStart, shiftEnd);
   const minutesUntilEnd = shiftLen - minutesIntoShift;
   const shiftProgress = Math.max(0, Math.min(1, minutesIntoShift / shiftLen));
-
-  // Store day math
-  const storeLen = storeClose >= storeOpen ? storeClose - storeOpen : 1440 - storeOpen + storeClose;
-  let minutesIntoStore;
-  if (storeClose >= storeOpen) {
-    minutesIntoStore = currentMin - storeOpen;
-  } else {
-    minutesIntoStore = currentMin >= storeOpen ? currentMin - storeOpen : 1440 - storeOpen + currentMin;
-  }
-
 
   // Coverage mode + handoff detection
   let coverageMode = "solo";
@@ -637,15 +627,15 @@ function computeItemStates(rules, prevStates, setup, ctx, queueState, checkConfi
 }
 
 // ─── PACING LANGUAGE ───
-function getPacingLine(ctx, visibleCount, coverageMode, queueState, coveredCount, totalActionable, taskCount, checkCount) {
+function getPacingLine(ctx, { visibleCount = 0, coverageMode = "solo", queueState = "ontrack", coveredCount = 0, totalActionable = 1, taskCount = 0, checkCount = 0 } = {}) {
   if (!ctx) return "";
-  const mode = coverageMode || "solo";
-  const q = queueState || "ontrack";
-  const c = coveredCount || 0;
+  const mode = coverageMode;
+  const q = queueState;
+  const c = coveredCount;
   const total = totalActionable || 1;
   const pct = total > 0 ? c / total : 0;
-  const tasks = taskCount || 0;
-  const checks = checkCount || 0;
+  const tasks = taskCount;
+  const checks = checkCount;
 
   // High demand override — protective
   if (q === "highdemand") {
@@ -1936,7 +1926,7 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
 
   const visibleChecks = visible.filter(isCheckItem).length;
   const visibleTasks = visible.length - visibleChecks;
-  const pacingLine = getPacingLine(ctx, visible.length, ctx.coverageMode, queueState, coveredCount, totalActionable, visibleTasks, visibleChecks);
+  const pacingLine = getPacingLine(ctx, { visibleCount: visible.length, coverageMode: ctx.coverageMode, queueState, coveredCount, totalActionable, taskCount: visibleTasks, checkCount: visibleChecks });
   const phaseLabel = getPhaseLabel(ctx);
   const highPressure = visible.length > 5 || queueState === "highdemand" || queueState === "needsfocus";
 
@@ -3757,6 +3747,9 @@ function RxTempoApp() {
     button:active { transform: scale(0.97); }
     button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid ${MF.accent}; outline-offset: 2px; }
     input[type="range"] { height: 28px; cursor: pointer; }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+    }
   `;
 
   // LANDING PAGE
