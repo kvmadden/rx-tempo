@@ -1764,6 +1764,7 @@ function StartDayScreen({ onComplete }) {
                   />
                   {dayNotes.length > 1 && (
                     <button
+                      aria-label="Delete note"
                       onClick={() => setDayNotes(dayNotes.filter((_, i) => i !== idx))}
                       style={{
                         background: "none", border: `1px solid ${MF.border}`, borderRadius: MF.radiusSm,
@@ -2534,7 +2535,7 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
                   <span style={{ fontSize: "12px", color: MF.textMuted }}>{e.label}</span>
                 </div>
                 <select
-                  value={eventArrivals[e.key]}
+                  value={eventArrivals[e.key] ?? 0}
                   onChange={(ev) => onEventArrival(e.key, +ev.target.value)}
                   style={{
                     background: "transparent", border: `1px solid ${MF.border}`, borderRadius: "6px",
@@ -3429,7 +3430,7 @@ function TimeSimulator({ simTime, onSimTimeChange, onClose, onReset, shiftStart,
         <span style={{ fontSize: "12px", fontWeight: 600, color: MF.accent, textTransform: "uppercase", letterSpacing: "0.06em" }}>
           Time Simulator
         </span>
-        <button onClick={onClose} style={{
+        <button aria-label="Close simulator" onClick={onClose} style={{
           background: "none", border: "none", color: MF.textMuted, cursor: "pointer",
           fontSize: "18px", fontFamily: MF.font, padding: "0 4px",
         }}>×</button>
@@ -3512,12 +3513,26 @@ export default function RxTempo() {
     return d;
   }, [now, simMode, simTime]);
 
+  const handleReset = useCallback(() => {
+    setSetup(null);
+    setItemStates({});
+    setCheckConfirmedAt({});
+    setEventArrivals({});
+    setQueueState("ontrack");
+    setVaccineCount(0);
+    setDayNoteStates({});
+    setDayNoteConfirm(null);
+    setScreen("landing");
+    setSimMode(false);
+    setSimTime(null);
+  }, []);
+
   // Auto-expire: 24hr ceiling
   useEffect(() => {
     if (setup && Date.now() - setup.setupTimestamp > 24 * 60 * 60 * 1000) {
       handleReset();
     }
-  }, [now, setup]);
+  }, [now, setup, handleReset]);
 
   const ctx = useMemo(() => deriveContext(setup, effectiveNow), [setup, effectiveNow]);
 
@@ -3634,20 +3649,6 @@ export default function RxTempo() {
     setScreen("home");
     // Default sim time to shift start
     setSimTime(data.shiftStart);
-  };
-
-  const handleReset = () => {
-    setSetup(null);
-    setItemStates({});
-    setCheckConfirmedAt({});
-    setEventArrivals({});
-    setQueueState("ontrack");
-    setVaccineCount(0);
-    setDayNoteStates({});
-    setDayNoteConfirm(null);
-    setScreen("landing");
-    setSimMode(false);
-    setSimTime(null);
   };
 
   const handleSimTimeChange = (min) => {
