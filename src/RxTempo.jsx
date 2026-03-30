@@ -443,7 +443,7 @@ function deriveContext(setup, now) {
 
   const { len: shiftLen, into: minutesIntoShift } = rangeCalc(currentMin, shiftStart, shiftEnd);
   const minutesUntilEnd = shiftLen - minutesIntoShift;
-  const shiftProgress = Math.max(0, Math.min(1, minutesIntoShift / shiftLen));
+  const shiftProgress = shiftLen > 0 ? Math.max(0, Math.min(1, minutesIntoShift / shiftLen)) : 0;
 
   // Coverage mode + handoff detection
   let coverageMode = "solo";
@@ -632,8 +632,9 @@ function getPacingLine(ctx, { visibleCount = 0, coverageMode = "solo", queueStat
   const mode = coverageMode;
   const q = queueState;
   const c = coveredCount;
-  const total = totalActionable || 1;
-  const pct = total > 0 ? c / total : 0;
+  if (totalActionable === 0) return "";
+  const total = totalActionable;
+  const pct = c / total;
   const tasks = taskCount;
   const checks = checkCount;
 
@@ -689,6 +690,7 @@ function getPacingLine(ctx, { visibleCount = 0, coverageMode = "solo", queueStat
 
 function getPhaseLabel(ctx) {
   if (!ctx) return "";
+  if (ctx.shiftProgress == null) return "Early shift";
   if (ctx.shiftProgress < 0.12) return "Early shift";
   if (ctx.shiftProgress < 0.35) return "Getting into rhythm";
   if (ctx.shiftProgress < 0.55) return "Mid-shift";
@@ -879,7 +881,10 @@ function SelectField({ label, value, onChange, options, style: extraStyle }) {
           id={selectId}
           style={{ width: "100%", background: MF.card, color: MF.text, border: `1px solid ${MF.border}`, borderRadius: MF.radiusSm, padding: "12px 40px 12px 14px", fontSize: "15px", fontFamily: MF.font, appearance: "none", cursor: "pointer" }}
           value={value}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => {
+            const raw = e.target.value;
+            onChange(options.length > 0 && typeof options[0].value === "number" ? +raw : raw);
+          }}
         >
           {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
@@ -925,12 +930,28 @@ function QuietState({ message, sub }) {
   );
 }
 
+const InfoLine = ({ label, value }) => (
+  <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: `1px solid ${MF.border}`, gap: "12px" }}>
+    <span style={{ fontSize: "12px", color: MF.textMuted }}>{label}</span>
+    <span style={{ fontSize: "12px", fontWeight: 600, color: MF.text, textAlign: "right" }}>{value}</span>
+  </div>
+);
+
+const InfoBullet = ({ children }) => (
+  <div style={{ display: "flex", gap: "8px", padding: "4px 0", fontSize: "12px", color: MF.textMuted, lineHeight: 1.5 }}>
+    <span style={{ color: MF.accent, flexShrink: 0 }}>·</span>
+    <span>{children}</span>
+  </div>
+);
+
 // Slide-out info panel with expandable sections
 function InfoPanel({ show, onClose }) {
   const [expanded, setExpanded] = useState(null);
   const toggle = (key) => setExpanded((prev) => prev === key ? null : key);
   const panelRef = useRef(null);
   const previousFocusRef = useRef(null);
+  const onCloseRef = useRef(onClose);
+  useEffect(() => { onCloseRef.current = onClose; });
 
   useEffect(() => {
     if (!show) return;
@@ -940,8 +961,9 @@ function InfoPanel({ show, onClose }) {
       const firstFocusable = panel.querySelector("button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])");
       if (firstFocusable) firstFocusable.focus();
     }
+    document.body.style.overflow = "hidden";
     const handleKey = (e) => {
-      if (e.key === "Escape") { onClose(); return; }
+      if (e.key === "Escape") { onCloseRef.current(); return; }
       if (e.key !== "Tab" || !panel) return;
       const focusable = panel.querySelectorAll("button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])");
       if (focusable.length === 0) return;
@@ -953,113 +975,100 @@ function InfoPanel({ show, onClose }) {
     window.addEventListener("keydown", handleKey);
     return () => {
       window.removeEventListener("keydown", handleKey);
+      document.body.style.overflow = "";
       if (previousFocusRef.current && previousFocusRef.current.focus) previousFocusRef.current.focus();
     };
-  }, [show, onClose]);
+  }, [show]);
 
   if (!show) return null;
-
-  const Line = ({ label, value }) => (
-    <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: `1px solid ${MF.border}`, gap: "12px" }}>
-      <span style={{ fontSize: "12px", color: MF.textMuted }}>{label}</span>
-      <span style={{ fontSize: "12px", fontWeight: 600, color: MF.text, textAlign: "right" }}>{value}</span>
-    </div>
-  );
-
-  const Bullet = ({ children }) => (
-    <div style={{ display: "flex", gap: "8px", padding: "4px 0", fontSize: "12px", color: MF.textMuted, lineHeight: 1.5 }}>
-      <span style={{ color: MF.accent, flexShrink: 0 }}>·</span>
-      <span>{children}</span>
-    </div>
-  );
 
   const sections = [
     { key: "how", title: "How it works", icon: "◎", render: () => (
       <>
-        <Line label="Input" value="Time + role + shift" />
-        <Line label="Engine" value="Surfaces what matters now — time, progress, what's handled" />
-        <Line label="Output" value="Right task, right moment" />
-        <Line label="Adapts to" value="Queue pressure + coverage" />
-        <Line label="Resets" value="Every shift (24hr max)" />
+        <InfoLine label="Input" value="Time + role + shift" />
+        <InfoLine label="Engine" value="Surfaces what matters now — time, progress, what's handled" />
+        <InfoLine label="Output" value="Right task, right moment" />
+        <InfoLine label="Adapts to" value="Queue pressure + coverage" />
+        <InfoLine label="Resets" value="Every shift (24hr max)" />
       </>
     )},
     { key: "data", title: "Your data & privacy", icon: "◇", render: () => (
       <>
-        <Bullet>No login, no account, no backend</Bullet>
-        <Bullet>All state lives in device memory only</Bullet>
-        <Bullet>Resets automatically within 24 hours</Bullet>
-        <Bullet>No one can see your activity — ever</Bullet>
-        <Bullet>No data leaves your device</Bullet>
+        <InfoBullet>No login, no account, no backend</InfoBullet>
+        <InfoBullet>All state lives in device memory only</InfoBullet>
+        <InfoBullet>Resets automatically within 24 hours</InfoBullet>
+        <InfoBullet>No one can see your activity — ever</InfoBullet>
+        <InfoBullet>No data leaves your device</InfoBullet>
       </>
     )},
     { key: "handoffs", title: "Handoffs", icon: "⇄", render: () => (
       <>
-        <Line label="Arrival screen" value="What to align on" />
-        <Line label="Exit screen" value="What's still open" />
-        <Line label="Format" value="Side-by-side conversation" />
-        <Line label="Devices" value="Independent — no sync" />
+        <InfoLine label="Arrival screen" value="What to align on" />
+        <InfoLine label="Exit screen" value="What's still open" />
+        <InfoLine label="Format" value="Side-by-side conversation" />
+        <InfoLine label="Devices" value="Independent — no sync" />
       </>
     )},
     { key: "queue", title: "Workflow status", icon: "◈", render: () => (
       <>
-        <Line label="All clear" value="Get Ahead + immunizations surface" />
-        <Line label="On track" value="Steady — default state" />
-        <Line label="Needs focus" value="Optional items hide" />
-        <Line label="High demand" value="Protective mode — essentials only" />
+        <InfoLine label="All clear" value="Get Ahead + immunizations surface" />
+        <InfoLine label="On track" value="Steady — default state" />
+        <InfoLine label="Needs focus" value="Optional items hide" />
+        <InfoLine label="High demand" value="Protective mode — essentials only" />
         <div style={{ fontSize: "11px", color: MF.textMuted, opacity: 0.6, marginTop: "6px", fontStyle: "italic" }}>Self-reported · Never stored · Never shared</div>
       </>
     )},
     { key: "imm", title: "Immunizations", icon: "＋", render: () => (
       <>
-        <Bullet>Optional daily target set during setup</Bullet>
-        <Bullet>Tap +Vaccine when you give one</Bullet>
-        <Bullet>Always user-initiated — app never asks</Bullet>
-        <Bullet>Always visible, even in High demand</Bullet>
-        <Bullet>Never framed as pressure or guilt</Bullet>
+        <InfoBullet>Optional daily target set during setup</InfoBullet>
+        <InfoBullet>Tap +Vaccine when you give one</InfoBullet>
+        <InfoBullet>Always user-initiated — app never asks</InfoBullet>
+        <InfoBullet>Always visible, even in High demand</InfoBullet>
+        <InfoBullet>Never framed as pressure or guilt</InfoBullet>
       </>
     )},
     { key: "events", title: "Events & deliveries", icon: "◉", render: () => (
       <>
-        <Line label="Setup" value="Flag what to expect today" />
-        <Line label="During shift" value="Tap 'Arrived' when it happens" />
-        <Line label="Arrival time" value="Editable if you forgot" />
-        <Line label="Warehouse" value="2hr check-in window" />
-        <Line label="OV order" value="90min processing window" />
-        <Line label="USPS" value="20min handoff window" />
+        <InfoLine label="Setup" value="Flag what to expect today" />
+        <InfoLine label="During shift" value="Tap 'Arrived' when it happens" />
+        <InfoLine label="Arrival time" value="Editable if you forgot" />
+        <InfoLine label="Warehouse" value="2hr check-in window" />
+        <InfoLine label="OV order" value="90min processing window" />
+        <InfoLine label="USPS" value="20min handoff window" />
       </>
     )},
     { key: "ahead", title: "Get Ahead", icon: "»", render: () => (
       <>
-        <Bullet>Tasks not due yet that can be done early</Bullet>
-        <Bullet>Handled early = removed from later reminders</Bullet>
-        <Bullet>Hides automatically when queues need focus</Bullet>
-        <Bullet>A reward for calm moments, never an expectation</Bullet>
+        <InfoBullet>Tasks not due yet that can be done early</InfoBullet>
+        <InfoBullet>Handled early = removed from later reminders</InfoBullet>
+        <InfoBullet>Hides automatically when queues need focus</InfoBullet>
+        <InfoBullet>A reward for calm moments, never an expectation</InfoBullet>
       </>
     )},
     { key: "still", title: "Still open items", icon: "○", render: () => (
       <>
-        <Line label="What" value="Window passed, not yet actioned" />
-        <Line label="Already handled" value="Confirm it — moves to covered" />
-        <Line label="Still needs attention" value="Flags it for follow-up" />
-        <Line label="Skip for today" value="Dismisses cleanly" />
+        <InfoLine label="What" value="Window passed, not yet actioned" />
+        <InfoLine label="Already handled" value="Confirm it — moves to covered" />
+        <InfoLine label="Still needs attention" value="Flags it for follow-up" />
+        <InfoLine label="Skip for today" value="Dismisses cleanly" />
       </>
     )},
     { key: "leader", title: "For leadership", icon: "◆", render: () => (
       <>
-        <Bullet>Keeps immunizations visible as a daily priority</Bullet>
-        <Bullet>Helps staff stay organized without adding oversight</Bullet>
-        <Bullet>Adapts to busy days — quieter when it counts</Bullet>
-        <Bullet>Nothing tracked, reported, or stored</Bullet>
-        <Bullet>Easy to pilot — no setup, no rollout risk</Bullet>
+        <InfoBullet>Keeps immunizations visible as a daily priority</InfoBullet>
+        <InfoBullet>Helps staff stay organized without adding oversight</InfoBullet>
+        <InfoBullet>Adapts to busy days — quieter when it counts</InfoBullet>
+        <InfoBullet>Nothing tracked, reported, or stored</InfoBullet>
+        <InfoBullet>Easy to pilot — no setup, no rollout risk</InfoBullet>
       </>
     )},
-    { key: "principles", title: "Design principles", icon: "◇", render: () => (
+    { key: "principles", title: "Design principles", icon: "△", render: () => (
       <>
-        <Line label="Primary model" value="Time, not tasks" />
-        <Line label="Confirmation" value="More powerful than completion" />
-        <Line label="Silence" value="A feature, not a failure" />
-        <Line label="Optional" value="Must actually mean optional" />
-        <Line label="Purpose" value="Conversation starter, not the conversation" />
+        <InfoLine label="Primary model" value="Time, not tasks" />
+        <InfoLine label="Confirmation" value="More powerful than completion" />
+        <InfoLine label="Silence" value="A feature, not a failure" />
+        <InfoLine label="Optional" value="Must actually mean optional" />
+        <InfoLine label="Purpose" value="Conversation starter, not the conversation" />
       </>
     )},
   ];
@@ -1204,7 +1213,6 @@ function StartDayScreen({ onComplete }) {
     },
     immTarget: +immTarget,
     guidance,
-    setupTimestamp: Date.now(),
   };
 
   if (step === "confirm") {
@@ -1253,7 +1261,7 @@ function StartDayScreen({ onComplete }) {
 
         <button
           style={{ background: MF.gradient, color: "#fff", border: "none", borderRadius: MF.radiusSm, padding: "14px 24px", fontSize: "15px", fontWeight: 600, fontFamily: MF.font, cursor: "pointer", width: "100%", letterSpacing: "-0.01em", marginBottom: "10px" }}
-          onClick={() => onComplete(setupData)}
+          onClick={() => onComplete({ ...setupData, setupTimestamp: Date.now() })}
         >
           Let's go
         </button>
@@ -1432,10 +1440,10 @@ function StartDayScreen({ onComplete }) {
             </div>
 
             {/* Pharmacy hours — disabled when 24hr */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", opacity: is24hrToggle ? 0.4 : 1, pointerEvents: is24hrToggle ? "none" : "auto" }}>
+            <fieldset disabled={is24hrToggle} style={{ border: "none", padding: 0, margin: 0, display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", opacity: is24hrToggle ? 0.4 : 1 }}>
               <SelectField label="Pharmacy Opens" value={storeOpen} onChange={handleStoreOpenChange} options={TIME_OPTIONS} />
               <SelectField label="Pharmacy Closes" value={storeClose} onChange={handleStoreCloseChange} options={TIME_OPTIONS} />
-            </div>
+            </fieldset>
             {is24hrToggle && (
               <div style={{ fontSize: "11px", color: MF.accent, marginTop: "-12px", marginBottom: "12px", opacity: 0.7 }}>
                 24-hour pharmacy — open around the clock.
@@ -1467,7 +1475,7 @@ function StartDayScreen({ onComplete }) {
                 width: "100%", letterSpacing: "-0.01em",
                 opacity: shiftValid ? 1 : 0.5,
               }}
-              aria-disabled={!shiftValid}
+              disabled={!shiftValid}
               onClick={() => shiftValid && setStep("form2")}
             >
               Next
@@ -1520,10 +1528,10 @@ function StartDayScreen({ onComplete }) {
               const updateWindow = (idx, field, val) => {
                 setOverlapWindows((prev) => prev.map((w, i) => {
                   if (i !== idx) return w;
-                  const updated = { ...w, [field]: val };
+                  const updated = { ...w, [field]: +val };
                   // Auto-swap if start > end (non-overnight shifts)
                   const s = +shiftStart, e = +shiftEnd;
-                  if (e >= s && +updated.start > +updated.end) {
+                  if (e >= s && +updated.start >= +updated.end) {
                     return { start: updated.end, end: updated.start };
                   }
                   return updated;
@@ -1588,7 +1596,7 @@ function StartDayScreen({ onComplete }) {
                 const isOn = value === "yes";
                 const handleTap = () => {
                   // If turning off something expected for this day, confirm first
-                  if (isOn && defaultExpected) {
+                  if (isOn && defaultExpected && !confirmToggle) {
                     setConfirmToggle({ key: label, label, setter: () => onChange("no") });
                   } else {
                     onChange(isOn ? "no" : "yes");
@@ -1707,7 +1715,7 @@ function StartDayScreen({ onComplete }) {
                 max="500"
                 value={immTarget}
                 onChange={(e) => { setImmTarget(e.target.value); setImmLowConfirmed(false); }}
-                onBlur={() => { if (immTarget === "" || immTarget === "0") setImmTarget("6"); }}
+                onBlur={() => { if (immTarget === "") setImmTarget("6"); }}
                 placeholder="6"
                 style={{
                   width: "100%", background: MF.card, color: MF.text,
@@ -1824,10 +1832,10 @@ function StartDayScreen({ onComplete }) {
                   flex: 2, letterSpacing: "-0.01em",
                   opacity: canProceed ? 1 : 0.5,
                 }}
+                disabled={!canProceed && !(immTooLow && !immLowConfirmed)}
                 aria-disabled={!canProceed}
                 onClick={() => {
                   if (canProceed) {
-                    // Auto-fill empty immunization target
                     if (immTarget === "") setImmTarget("6");
                     setStep("confirm");
                   } else if (immTooLow && !immLowConfirmed) {
@@ -1846,7 +1854,7 @@ function StartDayScreen({ onComplete }) {
 
 // HOME
 function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArrivals, onEventArrival, queueState, onQueueState, vaccineCount, onVaccine, dayNoteStates, onDayNoteState, dayNoteConfirm, onDayNoteConfirm, checkConfirmedAt }) {
-  const [immExpanded, setImmExpanded] = useState(false);
+  const [immExpanded, setImmExpanded] = useState(null);
   const [expandedItem, setExpandedItem] = useState(null);
   const [showStillOpen, setShowStillOpen] = useState(false);
   const [showCovered, setShowCovered] = useState(false);
@@ -1932,7 +1940,7 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
         <div style={{ fontSize: "12px", color: MF.textMuted, marginBottom: "5px", display: "flex", alignItems: "baseline", gap: "4px" }}>
           <span style={{ fontWeight: 600, color: MF.accent }}>{phaseLabel}</span>
           <span style={{ opacity: 0.4 }}>·</span>
-          <span>{ROLE_LABELS[setup.role]}</span>
+          <span>{ROLE_LABELS[setup.role] ?? setup.role}</span>
           <span style={{ opacity: 0.4 }}>·</span>
           <span>{fmtTime12(ctx.currentMin)}</span>
         </div>
@@ -2289,7 +2297,7 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
                     {isHandoff && <span style={badge(MF.accent, MF.accentDim)}>Handoff</span>}
-                    {isAttention && !isEscalated && <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: MF.amber }} />}
+                    {isAttention && !isEscalated && <span role="img" aria-label="Needs attention" style={{ width: "6px", height: "6px", borderRadius: "50%", background: MF.amber }} />}
                     <ExpandChevron isOpen={isOpen} />
                   </div>
                 </button>
@@ -2511,8 +2519,8 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
         ].filter((e) => expected[e.key]);
 
         if (allEvents.length === 0) return null;
-        const pending = allEvents.filter((e) => !(eventArrivals[e.key] ?? 0));
-        const arrived = allEvents.filter((e) => !!(eventArrivals[e.key] ?? 0));
+        const pending = allEvents.filter((e) => eventArrivals[e.key] == null);
+        const arrived = allEvents.filter((e) => eventArrivals[e.key] != null);
 
         if (pending.length === 0 && arrived.length === 0) return null;
         return (
@@ -2550,7 +2558,8 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
                   <span style={{ fontSize: "12px", color: MF.textMuted }}>{e.label}</span>
                 </div>
                 <select
-                  value={eventArrivals[e.key] ?? 0}
+                  aria-label={`${e.label} arrival time`}
+                  value={eventArrivals[e.key] ?? ""}
                   onChange={(ev) => onEventArrival(e.key, +ev.target.value)}
                   style={{
                     background: "transparent", border: `1px solid ${MF.border}`, borderRadius: "6px",
@@ -2571,23 +2580,23 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
       {setup.immTarget > 0 && onVaccine && (() => {
         // Auto-expand when queues are clear and target not yet met
         const autoExpand = queueState === "clear" && vaccineCount < setup.immTarget;
-        const isExpanded = immExpanded || autoExpand;
+        const isExpanded = immExpanded !== null ? immExpanded : autoExpand;
         return (
         <div style={{ marginTop: "8px" }}>
           <button
             aria-expanded={isExpanded}
-            onClick={() => setImmExpanded(!immExpanded)}
+            onClick={() => setImmExpanded((prev) => prev === null ? !autoExpand : !prev)}
             style={{
               width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center",
               padding: "12px 16px", background: MF.card,
-              border: `1px solid ${autoExpand && !immExpanded ? MF.accent + "40" : MF.border}`,
+              border: `1px solid ${autoExpand && immExpanded === null ? MF.accent + "40" : MF.border}`,
               borderRadius: isExpanded ? `${MF.radiusSm} ${MF.radiusSm} 0 0` : MF.radiusSm,
               cursor: "pointer", fontFamily: MF.font,
             }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               <span style={{ fontSize: "13px", fontWeight: 600, color: MF.text }}>Immunizations</span>
-              {autoExpand && !immExpanded && (
+              {autoExpand && immExpanded === null && (
                 <span style={{ fontSize: "10px", color: MF.accent, fontWeight: 500 }}>Good time to think about this</span>
               )}
             </div>
@@ -2600,7 +2609,7 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
           </button>
           {isExpanded && (
             <div style={{
-              padding: "12px 16px", background: MF.card, border: `1px solid ${autoExpand && !immExpanded ? MF.accent + "40" : MF.border}`, borderTop: "none",
+              padding: "12px 16px", background: MF.card, border: `1px solid ${autoExpand && immExpanded === null ? MF.accent + "40" : MF.border}`, borderTop: "none",
               borderRadius: `0 0 ${MF.radiusSm} ${MF.radiusSm}`,
             }}>
               {/* Progress bar */}
@@ -2744,12 +2753,14 @@ function useItemConfirmState(onAction) {
   const [expandedItem, setExpandedItem] = useState(null);
   const [justConfirmed, setJustConfirmed] = useState(null);
   const timerRef = useRef(null);
+  const onActionRef = useRef(onAction);
+  useEffect(() => { onActionRef.current = onAction; });
   useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
   const handleConfirm = (ruleId, state) => {
     if (timerRef.current) clearTimeout(timerRef.current);
     haptic();
     setJustConfirmed(ruleId);
-    timerRef.current = setTimeout(() => { onAction(ruleId, state); setExpandedItem(null); setJustConfirmed(null); timerRef.current = null; }, CONFIRM_FLASH_MS);
+    timerRef.current = setTimeout(() => { onActionRef.current(ruleId, state); setExpandedItem(null); setJustConfirmed(null); timerRef.current = null; }, CONFIRM_FLASH_MS);
   };
   return { expandedItem, setExpandedItem, justConfirmed, handleConfirm };
 }
@@ -2868,7 +2879,7 @@ function ArrivalScreen({ rules, itemStates, ctx, onAction, setup }) {
                     </div>
                   </div>
                   {isComp && <RequiredBadge />}
-                  {isAttention && !isComp && <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: MF.amber, flexShrink: 0 }} />}
+                  {isAttention && !isComp && <span role="img" aria-label="Needs attention" style={{ width: "6px", height: "6px", borderRadius: "50%", background: MF.amber, flexShrink: 0 }} />}
                   <ExpandChevron isOpen={isOpen} />
                 </button>
 
@@ -2918,6 +2929,11 @@ function LaterTodayScreen({ rules, itemStates, setup, ctx, onAction }) {
     if ([S.VISIBLE, S.VISIBLE_HANDOFF, S.NEEDS_ATTENTION].includes(itemStates[r.id])) return false;
     if (itemStates[r.id] !== S.HIDDEN) return false;
     const win = resolveWindow(r, setup);
+    // Exclude items whose window has already passed (handles overnight windows)
+    const alreadyPassed = win.end >= win.start
+      ? ctx.currentMin > win.end
+      : ctx.currentMin > win.end && ctx.currentMin < win.start;
+    if (alreadyPassed) return false;
     return win.start > ctx.currentMin;
   }), [rules, itemStates, setup, ctx.currentMin]);
 
@@ -3042,7 +3058,7 @@ function GetAheadScreen({ rules, itemStates, ctx, onAction, queueState }) {
       r.getAheadEligible && ![S.CONFIRMED, S.HANDLED_EARLY, S.NOT_APPLICABLE].includes(itemStates[r.id])
     ),
     activeCount: Object.values(itemStates).filter(
-      (s) => s === S.VISIBLE || s === S.NEEDS_ATTENTION
+      (s) => s === S.VISIBLE || s === S.NEEDS_ATTENTION || s === S.VISIBLE_HANDOFF
     ).length,
   }), [rules, itemStates]);
   const toobusy = activeCount > 4 || ctx.timingPressure === "end-of-day" || queueState === "needsfocus" || queueState === "highdemand";
@@ -3145,7 +3161,7 @@ function ExitScreen({ rules, itemStates, ctx, setup, onAction, vaccineCount }) {
       r.handoffEligibility === "exit" &&
       [S.CONFIRMED, S.HANDLED_EARLY].includes(itemStates[r.id])
     ),
-    stillOpenExit: getStillOpenItems(rules, itemStates, setup, ctx),
+    stillOpenExit: getStillOpenItems(rules, itemStates, setup, ctx).filter((r) => r.handoffEligibility === "exit"),
   }), [rules, itemStates, setup, ctx]);
 
   const mentionCount = unresolved.length + stillOpenExit.length;
@@ -3351,8 +3367,8 @@ function ExitScreen({ rules, itemStates, ctx, setup, onAction, vaccineCount }) {
                   <div style={{ padding: "0 16px 14px", animation: "fadeIn 0.15s ease" }}>
                     <div style={{ fontSize: "13px", color: MF.textMuted, lineHeight: 1.6, marginBottom: "12px" }}>{r.description}</div>
                     <div style={{ display: "flex", gap: "6px" }}>
-                      <button style={btn(MF.green, MF.greenDim)} onClick={() => { onAction(r.id, S.CONFIRMED); setExpandedItem(null); }}>Handled</button>
-                      <button style={btn(MF.textMuted, MF.mutedBg)} onClick={() => { onAction(r.id, S.NOT_APPLICABLE); setExpandedItem(null); }}>Skip</button>
+                      <button style={btn(MF.green, MF.greenDim)} onClick={() => handleConfirm(r.id, S.CONFIRMED)}>Handled</button>
+                      <button style={btn(MF.textMuted, MF.mutedBg)} onClick={() => handleConfirm(r.id, S.NOT_APPLICABLE)}>Skip</button>
                     </div>
                   </div>
                 )}
@@ -3398,8 +3414,8 @@ function TimeSimulator({ simTime, onSimTimeChange, onClose, onReset, shiftStart,
     { label: "+30 min", min: (shiftStart + 30) % 1440 },
     { label: "+2 hrs", min: (shiftStart + 120) % 1440 },
     { label: "Mid-shift", min: (shiftStart + Math.floor(shiftLen / 2)) % 1440 },
-    { label: "-1 hr", min: (shiftStart + shiftLen - 60 + 1440) % 1440 },
-    { label: "-20 min", min: (shiftStart + shiftLen - 20 + 1440) % 1440 },
+    { label: "-1 hr", min: (shiftStart + Math.max(0, shiftLen - 60) + 1440) % 1440 },
+    { label: "-20 min", min: (shiftStart + Math.max(0, shiftLen - 20) + 1440) % 1440 },
     { label: "Shift end", min: shiftEnd },
   ];
 
@@ -3479,7 +3495,7 @@ function TimeSimulator({ simTime, onSimTimeChange, onClose, onReset, shiftStart,
 
 // ─── ERROR BOUNDARY ───
 class AppErrorBoundary extends Component {
-  constructor(props) { super(props); this.state = { hasError: false }; }
+  constructor(props) { super(props); this.state = { hasError: false, errorKey: 0 }; }
   static getDerivedStateFromError() { return { hasError: true }; }
   render() {
     if (this.state.hasError) {
@@ -3488,14 +3504,14 @@ class AppErrorBoundary extends Component {
           <div style={{ fontSize: "18px", fontWeight: 600, marginBottom: "12px" }}>Something went wrong</div>
           <div style={{ fontSize: "14px", color: "#777", marginBottom: "20px" }}>RxTempo hit an unexpected error.</div>
           <button
-            onClick={() => { this.setState({ hasError: false }); }}
+            onClick={() => { this.setState((prev) => ({ hasError: false, errorKey: prev.errorKey + 1 })); }}
             style={{ padding: "10px 24px", fontSize: "14px", fontWeight: 600, cursor: "pointer",
               border: "1px solid #999", borderRadius: "8px", background: "transparent", color: "inherit" }}
           >Try again</button>
         </div>
       );
     }
-    return this.props.children;
+    return <div key={this.state.errorKey}>{this.props.children}</div>;
   }
 }
 
@@ -3542,7 +3558,7 @@ function RxTempoApp() {
     const h = (e) => {
       if (e.key === "Escape") { setShowResetConfirm(false); return; }
       if (e.key !== "Tab" || !dialog) return;
-      const focusable = dialog.querySelectorAll("button");
+      const focusable = dialog.querySelectorAll("button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])");
       if (focusable.length === 0) return;
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
@@ -3612,7 +3628,7 @@ function RxTempoApp() {
     const extras = [];
 
     // Warehouse: once totes arrive, 2hr window to check them in
-    if (expected.warehouse && eventArrivals.warehouse) {
+    if (expected.warehouse && eventArrivals.warehouse != null) {
       const offset = ((eventArrivals.warehouse - (setup.shiftStart || 0)) + 1440) % 1440;
       extras.push({
         id: "event-warehouse",
@@ -3630,7 +3646,7 @@ function RxTempoApp() {
     }
 
     // OV delivery: once it arrives, 90min window to process
-    if (expected.ov && eventArrivals.ov) {
+    if (expected.ov && eventArrivals.ov != null) {
       const offset = ((eventArrivals.ov - (setup.shiftStart || 0)) + 1440) % 1440;
       extras.push({
         id: "event-ov",
@@ -3648,7 +3664,7 @@ function RxTempoApp() {
     }
 
     // USPS: once driver arrives, it's go-time — short window
-    if (expected.usps && eventArrivals.usps) {
+    if (expected.usps && eventArrivals.usps != null) {
       const offset = ((eventArrivals.usps - (setup.shiftStart || 0)) + 1440) % 1440;
       extras.push({
         id: "event-usps",
@@ -3666,7 +3682,7 @@ function RxTempoApp() {
     }
 
     // USPS: if expected but not yet arrived, surface a prep reminder in the second half of shift
-    if (expected.usps && !eventArrivals.usps) {
+    if (expected.usps && eventArrivals.usps == null) {
       extras.push({
         id: "event-usps-prep",
         label: "USPS pickup prep",
@@ -3705,6 +3721,8 @@ function RxTempoApp() {
   // Auto-return: after acting on arrival/exit items, return to Home after a beat
   const actionReturnRef = useRef(null);
   useEffect(() => () => { if (actionReturnRef.current) clearTimeout(actionReturnRef.current); }, []);
+  // Cancel auto-return timer on manual navigation
+  useEffect(() => { if (actionReturnRef.current) { clearTimeout(actionReturnRef.current); actionReturnRef.current = null; } }, [screen]);
   const handleActionAndReturn = useCallback((ruleId, newState) => {
     handleAction(ruleId, newState);
     if (actionReturnRef.current) clearTimeout(actionReturnRef.current);
@@ -3715,14 +3733,18 @@ function RxTempoApp() {
     setSetup(data);
     setItemStates({});
     setCheckConfirmedAt({});
+    setEventArrivals({});
+    setQueueState("ontrack");
+    setVaccineCount(0);
+    setDayNoteStates({});
+    setDayNoteConfirm(null);
     setScreen("home");
-    // Default sim time to shift start
+    setSimMode(false);
     setSimTime(data.shiftStart);
   };
 
   const handleSimTimeChange = (min) => {
     setSimTime(min);
-    // Reset all user-actioned states when time changes for clean demos
   };
 
   // Nav badge counts
@@ -3734,7 +3756,6 @@ function RxTempoApp() {
 
   // Global styles
   const globalCSS = `
-    @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
     @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
     @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     @keyframes slideInRight { from { transform: translateX(100%); } to { transform: translateX(0); } }
@@ -4080,7 +4101,7 @@ function RxTempoApp() {
 
       {/* ── RESET CONFIRMATION ── */}
       {showResetConfirm && (
-        <div ref={resetDialogRef} role="dialog" aria-modal="true" aria-label="Confirm reset" style={{
+        <div style={{
           position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 200,
           display: "flex", alignItems: "center", justifyContent: "center",
         }}>
@@ -4088,7 +4109,7 @@ function RxTempoApp() {
             position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
             background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)",
           }} />
-          <div style={{
+          <div ref={resetDialogRef} role="dialog" aria-modal="true" aria-label="Confirm reset" style={{
             position: "relative", width: "85%", maxWidth: "320px",
             background: MF.card, borderRadius: MF.radius, padding: "24px",
             border: `1px solid ${MF.border}`, textAlign: "center",
@@ -4127,7 +4148,7 @@ function RxTempoApp() {
           simTime={simTime ?? setup.shiftStart}
           onSimTimeChange={handleSimTimeChange}
           onClose={() => setSimMode(false)}
-          onReset={() => { setItemStates({}); setCheckConfirmedAt({}); }}
+          onReset={() => { setItemStates({}); setCheckConfirmedAt({}); setEventArrivals({}); setQueueState("ontrack"); setVaccineCount(0); setDayNoteStates({}); setDayNoteConfirm(null); }}
           shiftStart={setup.shiftStart}
           shiftEnd={setup.shiftEnd}
         />
@@ -4141,7 +4162,8 @@ function RxTempoApp() {
       {/* ── BOTTOM NAV ── */}
       <nav aria-label="Main navigation" style={{
         borderTop: `1px solid ${MF.border}`, background: MF.navBg,
-        backdropFilter: "blur(12px)", position: "sticky", bottom: 0, zIndex: 100,
+        backdropFilter: "blur(12px)", position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 100,
+        maxWidth: "430px", margin: "0 auto",
         paddingBottom: "env(safe-area-inset-bottom)",
       }}>
         <div style={{
@@ -4171,7 +4193,7 @@ function RxTempoApp() {
               <div style={{ position: "relative" }}>
                 {tab.icon}
                 {tab.badge > 0 && (
-                  <span style={{
+                  <span aria-label={`${tab.badge} items`} style={{
                     position: "absolute", top: "-5px", right: "-9px",
                     background: MF.accent, color: "#fff", fontSize: "9px", fontWeight: 700,
                     borderRadius: "50%", width: "15px", height: "15px",
