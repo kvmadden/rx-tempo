@@ -281,6 +281,209 @@ const RULES = [
     getAheadEligible: false,
     riskWeight: "medium",
   },
+  // ── DAILY: SUPPLIES & ENVIRONMENT ──
+  {
+    id: "mid-supplies",
+    label: "Refill vials, caps, and supplies",
+    description: "Check vial stock, amber caps, child-resistant caps, snap caps, ointment jars. Restocking now prevents a scramble when you're deep in fills.",
+    category: "midday",
+    itemType: "task",
+    usualWindow: { startOffset: 120, endOffset: 300 },
+    roleContext: "Whoever is near the bench.",
+    carryLogic: "carry",
+    handoffEligibility: null,
+    getAheadEligible: true,
+    riskWeight: "low",
+  },
+  {
+    id: "mid-paper-printers",
+    label: "Check paper and printer supplies",
+    description: "Label rolls, receipt paper, leaflet paper, toner. Running out mid-rush means someone has to stop filling to reload.",
+    category: "midday",
+    itemType: "check",
+    usualWindow: { startOffset: 60, endOffset: 180 },
+    roleContext: "Quick check before it becomes a problem.",
+    carryLogic: "carry",
+    handoffEligibility: null,
+    getAheadEligible: true,
+    riskWeight: "low",
+  },
+  {
+    id: "mid-surface-cleaning",
+    label: "Surface cleaning",
+    description: "Wipe down counters, consultation area, waiting area, and high-touch surfaces. Keeps the pharmacy presentable and reduces contamination risk.",
+    category: "midday",
+    itemType: "task",
+    usualWindow: { startOffset: 120, endOffset: 360 },
+    roleContext: "Fit it in during a calm stretch.",
+    carryLogic: "carry",
+    handoffEligibility: null,
+    getAheadEligible: true,
+    riskWeight: "low",
+  },
+  // ── DAILY: END-OF-DAY ──
+  {
+    id: "deadline-workbin",
+    label: "Scheduled work bin reconciliation",
+    description: "Clear scheduled work bin items — third-party rejects, pending prior auths, data entry holds. Anything left rolls into tomorrow's backlog.",
+    category: "deadline",
+    itemType: "task",
+    usualWindow: { startOffset: -90, endOffset: -15 },
+    roleContext: "Clean board for tomorrow's team.",
+    carryLogic: "carry",
+    handoffEligibility: "exit",
+    getAheadEligible: false,
+    riskWeight: "medium",
+  },
+  {
+    id: "deadline-safe-count",
+    label: "Safe count / safe drop",
+    description: "Count the safe, reconcile against register drops, and prepare the deposit. Discrepancies are easier to trace when caught the same day.",
+    category: "deadline",
+    itemType: "task",
+    usualWindow: { startOffset: -90, endOffset: -20 },
+    roleContext: "Closing pharmacist or designated closer.",
+    carryLogic: "carry",
+    handoffEligibility: "exit",
+    getAheadEligible: false,
+    riskWeight: "medium",
+  },
+  // ── DAILY: OV ORDER REVIEW (store-close-relative timing) ──
+  {
+    id: "daily-ov-review",
+    label: "OV order review",
+    description: "Review today's outside vendor order — verify pricing, check for discrepancies, confirm submission before the 7:25 PM cutoff.",
+    category: "deadline",
+    itemType: "compliance",
+    usualWindow: { startOffset: -120, endOffset: -30 }, // fallback; overridden by storeCloseWindow
+    storeCloseWindow: {
+      standardStart: 1095, // 6:15 PM (18*60+15)
+      standardEnd: 1155,   // 7:15 PM (19*60+15)
+      earlyCloseBuffer: 105, // 1hr 45min before close
+      earlyCloseWindowLen: 60, // 1hr window
+      earlyCloseThreshold: 1260, // 9:00 PM (21*60) — stores closing before this use early-close logic
+    },
+    dayFilter: [1, 2, 3, 4, 5], // Mon–Fri
+    roleContext: "Must be submitted before the system locks at 7:25 PM.",
+    carryLogic: "carry",
+    handoffEligibility: "exit",
+    getAheadEligible: false,
+    riskWeight: "medium",
+  },
+  // ── WEEKLY TASKS ──
+  {
+    id: "weekly-strongpack",
+    label: "Hazardous waste tote / StrongPack",
+    description: "Seal and manifest the hazardous waste StrongPack for pickup. Check container is properly labeled and ready for scheduled collection.",
+    category: "deadline",
+    itemType: "compliance",
+    usualWindow: { startOffset: -180, endOffset: -60 },
+    dayFilter: [4], // Thursday
+    roleContext: "Must be ready before pickup.",
+    carryLogic: "carry",
+    handoffEligibility: "exit",
+    getAheadEligible: false,
+    riskWeight: "high",
+  },
+  {
+    id: "weekly-ov-returns",
+    label: "Outside vendor returns",
+    description: "Process outside vendor returns — pull items, verify quantities, update return records. Must be ready before pickup.",
+    category: "midday",
+    itemType: "task",
+    usualWindow: { startOffset: 120, endOffset: 360 },
+    dayFilter: [3], // Wednesday
+    roleContext: "Usually handled at the bench.",
+    carryLogic: "carry",
+    handoffEligibility: "exit",
+    getAheadEligible: false,
+    riskWeight: "medium",
+  },
+  {
+    id: "weekly-ov-redeploy",
+    label: "Outside vendor redeploy",
+    description: "Process outside vendor redeploy — review restock needs, update PO records.",
+    category: "midday",
+    itemType: "task",
+    usualWindow: { startOffset: 120, endOffset: 360 },
+    dayFilter: [5], // Friday
+    roleContext: "Usually handled at the bench.",
+    carryLogic: "carry",
+    handoffEligibility: "exit",
+    getAheadEligible: false,
+    riskWeight: "medium",
+  },
+  {
+    id: "weekly-equipment",
+    label: "Equipment cleaning and checks",
+    description: "Clean counting trays, spatulas, fill equipment. Check automated equipment for maintenance needs.",
+    category: "midday",
+    itemType: "task",
+    usualWindow: { startOffset: 120, endOffset: 360 },
+    dayFilter: [2], // Tuesday (default — may change)
+    roleContext: "Fit it in during a calm stretch.",
+    carryLogic: "carry",
+    handoffEligibility: null,
+    getAheadEligible: true,
+    riskWeight: "low",
+  },
+  // ── MONTHLY TASKS ──
+  {
+    id: "monthly-flavorrx",
+    label: "Clean FlavoRx dispenser",
+    description: "Full cleaning of the FlavoRx dispenser per manufacturer guidelines. Prevents cross-contamination and keeps flavoring consistent.",
+    category: "midday",
+    itemType: "task",
+    usualWindow: { startOffset: 120, endOffset: 360 },
+    monthlyFilter: { dayOfMonth: 1, orFirstSunday: true },
+    roleContext: "Scheduled monthly maintenance.",
+    carryLogic: "carry",
+    handoffEligibility: null,
+    getAheadEligible: true,
+    riskWeight: "low",
+  },
+  {
+    id: "monthly-inmar",
+    label: "Inmar submission",
+    description: "Complete and submit Inmar returns processing. Deadline is the 10th of each month — anything submitted after that may not be credited.",
+    category: "midday",
+    itemType: "task",
+    usualWindow: { startOffset: 120, endOffset: 360 },
+    monthlyFilter: { before: 10 },
+    roleContext: "Don't miss the monthly cutoff.",
+    carryLogic: "carry",
+    handoffEligibility: null,
+    getAheadEligible: false,
+    riskWeight: "medium",
+  },
+  {
+    id: "monthly-dea222-audit",
+    label: "DEA 222 form reconciliation",
+    description: "Reconcile all DEA 222 order forms received this month against C-II deliveries. Verify each form is properly filed and accounted for. Missing forms must be reported.",
+    category: "midday",
+    itemType: "compliance",
+    usualWindow: { startOffset: 120, endOffset: 360 },
+    monthlyFilter: { firstWeek: true },
+    roleContext: "Pharmacist-in-charge or designee.",
+    carryLogic: "carry",
+    handoffEligibility: null,
+    getAheadEligible: false,
+    riskWeight: "high",
+  },
+  {
+    id: "monthly-bop-inspection",
+    label: "Board of Pharmacy self-inspection",
+    description: "Complete the Board of Pharmacy self-inspection checklist. Review licensing, signage, record-keeping, and operational compliance. Document and address any deficiencies.",
+    category: "midday",
+    itemType: "compliance",
+    usualWindow: { startOffset: 120, endOffset: 480 },
+    monthlyFilter: { firstWeek: true },
+    roleContext: "Pharmacist-in-charge responsibility.",
+    carryLogic: "carry",
+    handoffEligibility: null,
+    getAheadEligible: false,
+    riskWeight: "high",
+  },
 ];
 
 // ─── PERIODIC NUDGES ───
@@ -442,6 +645,19 @@ function isTimeInRange(current, start, end) {
 }
 
 function resolveWindow(rule, setup) {
+  // Store-close-relative window (e.g., OV order review)
+  if (rule.storeCloseWindow) {
+    const scw = rule.storeCloseWindow;
+    const storeClose = setup.storeClose || 1260; // default 9 PM
+    if (storeClose >= scw.earlyCloseThreshold) {
+      return { start: scw.standardStart, end: scw.standardEnd };
+    } else {
+      const end = (storeClose - scw.earlyCloseBuffer + 1440) % 1440;
+      const start = (end - scw.earlyCloseWindowLen + 1440) % 1440;
+      return { start, end };
+    }
+  }
+
   const { shiftStart, shiftEnd } = setup;
   const shiftLen = shiftEnd >= shiftStart ? shiftEnd - shiftStart : 1440 - shiftStart + shiftEnd;
   let start, end;
@@ -502,6 +718,38 @@ function computeItemStates(rules, prevStates, setup, ctx, queueState, checkConfi
       result[rule.id] = S.NEEDS_ATTENTION;
       visibleCount++;
       continue;
+    }
+
+    // Day-of-week filtering: hide tasks that aren't for today
+    if (rule.dayFilter) {
+      const todayDow = new Date().getDay();
+      if (!rule.dayFilter.includes(todayDow)) {
+        result[rule.id] = S.HIDDEN;
+        continue;
+      }
+    }
+
+    // Monthly filtering: hide tasks that aren't relevant this part of the month
+    if (rule.monthlyFilter) {
+      const todayDate = new Date();
+      const dom = todayDate.getDate();
+      const dow = todayDate.getDay();
+      const mf = rule.monthlyFilter;
+      let showToday = false;
+      if (mf.before) {
+        showToday = dom <= mf.before;
+      } else if (mf.firstWeek) {
+        showToday = dom <= 7;
+      } else if (mf.dayOfMonth) {
+        showToday = dom === mf.dayOfMonth;
+        if (!showToday && mf.orFirstSunday) {
+          showToday = dow === 0 && dom <= 7;
+        }
+      }
+      if (!showToday) {
+        result[rule.id] = S.HIDDEN;
+        continue;
+      }
     }
 
     // ShiftType suppression (compliance items always surface regardless of shift type)
@@ -3630,6 +3878,20 @@ function RxTempoApp() {
         roleContext: "Usually handled by whoever is at the bench.",
         carryLogic: "carry",
         handoffEligibility: "exit",
+        getAheadEligible: false,
+        riskWeight: "high",
+      });
+      // DEA 222: verify forms for any C-II items in this delivery
+      extras.push({
+        id: "event-dea222",
+        label: "DEA 222 form check",
+        description: "C-II delivery received — verify DEA 222 form matches the order. Check quantities, lot numbers, and file the completed form immediately. Do not defer.",
+        category: "midday",
+        itemType: "compliance",
+        usualWindow: { startOffset: offset, endOffset: offset + 120 },
+        roleContext: "Pharmacist-in-charge or verifying pharmacist.",
+        carryLogic: "carry",
+        handoffEligibility: null,
         getAheadEligible: false,
         riskWeight: "high",
       });
