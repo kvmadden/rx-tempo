@@ -256,19 +256,6 @@ const RULES = [
   },
   // ── ADDITIONAL MIDDAY ──
   {
-    id: "mid-waiters",
-    label: "Waiters check",
-    description: "Take a quick look around — is anyone sitting down waiting for you to tell them something's ready? A 10-second scan catches anyone who's been forgotten.",
-    category: "midday",
-    itemType: "check",
-    usualWindow: { startOffset: 60, endOffset: 360 },
-    roleContext: "Quick glance — anyone waiting on us?",
-    carryLogic: "suppress",
-    handoffEligibility: null,
-    getAheadEligible: false,
-    riskWeight: "low",
-  },
-  {
     id: "mid-voicemail",
     label: "Pharmacy voicemail",
     description: "A prescriber callback sitting in voicemail can delay a patient's fill for hours. Clearing the queue keeps things moving for everyone.",
@@ -278,19 +265,6 @@ const RULES = [
     roleContext: "Unanswered calls delay patient care.",
     carryLogic: "carry",
     handoffEligibility: "exit",
-    getAheadEligible: false,
-    riskWeight: "low",
-  },
-  {
-    id: "mid-callbacks",
-    label: "Callback check",
-    description: "Quick look — is anyone waiting to hear back from us? Insurance questions, special orders, prior auth updates. A 30-second scan of the callback list catches anyone we owe a call.",
-    category: "midday",
-    itemType: "check",
-    usualWindow: { startOffset: 120, endOffset: 360 },
-    roleContext: "Quick scan — do we owe anyone a call?",
-    carryLogic: "suppress",
-    handoffEligibility: null,
     getAheadEligible: false,
     riskWeight: "low",
   },
@@ -306,6 +280,26 @@ const RULES = [
     handoffEligibility: null,
     getAheadEligible: false,
     riskWeight: "medium",
+  },
+];
+
+// ─── PERIODIC NUDGES ───
+// These are "look around" awareness prompts — not tasks.
+// They surface periodically throughout the shift, auto-dismiss, and come back later.
+const NUDGES = [
+  {
+    id: "nudge-waiters",
+    label: "Anyone waiting on us?",
+    detail: "Quick glance at the waiting area — make sure nobody's been sitting there forgotten.",
+    intervalMin: 45, // resurface every ~45 minutes
+    activeAfterOffset: 30, // don't show in the first 30 min of shift
+  },
+  {
+    id: "nudge-callbacks",
+    label: "Do we owe anyone a call?",
+    detail: "Quick scan of the callback list — insurance questions, special orders, prior auth updates.",
+    intervalMin: 60,
+    activeAfterOffset: 90,
   },
 ];
 
@@ -1809,6 +1803,36 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
   const [confirmSkipCompliance, setConfirmSkipCompliance] = useState(null); // ruleId being skip-confirmed
   const confirmTimerRef = useRef(null);
 
+  // ── Periodic nudges (waiters, callbacks) ──
+  const [activeNudge, setActiveNudge] = useState(null);
+  const [nudgeDismissedAt, setNudgeDismissedAt] = useState({}); // { nudgeId: minuteOfDay }
+  const nudgeTimerRef = useRef(null);
+
+  useEffect(() => {
+    if (!ctx || queueState === "highdemand" || queueState === "needsfocus") {
+      setActiveNudge(null);
+      return;
+    }
+    const minutesIn = ctx.shiftProgress != null ? ctx.shiftProgress * ((ctx.shiftEnd - ctx.shiftStart + 1440) % 1440 || 480) : 0;
+    const eligible = NUDGES.filter((n) => {
+      if (minutesIn < n.activeAfterOffset) return false;
+      const last = nudgeDismissedAt[n.id];
+      if (last == null) return true;
+      return ctx.currentMin - last >= n.intervalMin || (ctx.currentMin < last && ctx.currentMin + 1440 - last >= n.intervalMin);
+    });
+    if (eligible.length === 0) { setActiveNudge(null); return; }
+    // Pick the one dismissed longest ago (or never dismissed)
+    const pick = eligible.sort((a, b) => (nudgeDismissedAt[a.id] ?? -9999) - (nudgeDismissedAt[b.id] ?? -9999))[0];
+    if (!activeNudge || activeNudge.id !== pick.id) setActiveNudge(pick);
+    // Auto-dismiss after 20 seconds
+    if (nudgeTimerRef.current) clearTimeout(nudgeTimerRef.current);
+    nudgeTimerRef.current = setTimeout(() => {
+      setActiveNudge(null);
+      setNudgeDismissedAt((prev) => ({ ...prev, [pick.id]: ctx.currentMin }));
+    }, 20000);
+    return () => { if (nudgeTimerRef.current) clearTimeout(nudgeTimerRef.current); };
+  }, [ctx?.currentMin, ctx?.shiftProgress, queueState, nudgeDismissedAt]);
+
   const MAX_SHOWN = 4;
   const isPIC = setup.role === "pharmacist-manager";
 
@@ -2033,6 +2057,30 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
           </div>
         );
       })()}
+
+      {/* ── Periodic nudge banner ── */}
+      {activeNudge && (
+        <button
+          onClick={() => {
+            setActiveNudge(null);
+            setNudgeDismissedAt((prev) => ({ ...prev, [activeNudge.id]: ctx.currentMin }));
+          }}
+          style={{
+            width: "100%", display: "flex", alignItems: "center", gap: "10px",
+            padding: "10px 14px", marginBottom: "6px",
+            background: `${MF.accent}08`, border: `1px solid ${MF.accent}20`,
+            borderRadius: MF.radiusSm, cursor: "pointer", fontFamily: MF.font,
+            animation: "fadeIn 0.4s ease",
+          }}
+        >
+          <span style={{ fontSize: "16px", opacity: 0.5, flexShrink: 0 }}>👀</span>
+          <div style={{ flex: 1, textAlign: "left" }}>
+            <div style={{ fontSize: "13px", fontWeight: 600, color: MF.text }}>{activeNudge.label}</div>
+            <div style={{ fontSize: "11px", color: MF.textMuted, marginTop: "2px" }}>{activeNudge.detail}</div>
+          </div>
+          <span style={{ fontSize: "11px", color: MF.textMuted, opacity: 0.4, flexShrink: 0 }}>tap to dismiss</span>
+        </button>
+      )}
 
       {/* Visible items — checks (quick) and tasks (expandable) */}
       {visible.length > 0 && (() => {
