@@ -1197,6 +1197,59 @@ function StartDayScreen({ onComplete }) {
   const [immLowConfirmed, setImmLowConfirmed] = useState(false);
   const [immNudgeFlash, setImmNudgeFlash] = useState(false);
 
+  // 24-hour pharmacy detection
+  const is24hr = is24hrToggle;
+
+  // Auto-infer the best shift type from times
+  const inferShiftType = (start, end, open, close) => {
+    const s = +start, e = +end, o = +open, c = +close;
+    if (e < s) return "overnight";
+    const isOpener = s <= o;
+    const isCloser = e >= c;
+    if (isOpener && isCloser) return "open-close";
+    if (isOpener) return "open-mid";
+    if (isCloser) return "mid-close";
+    return "mid";
+  };
+
+  // Determine which shift types are valid given current times
+  const getValidShiftTypes = () => {
+    const s = +shiftStart, e = +shiftEnd, o = +storeOpen, c = +storeClose;
+    const isOvernight = e < s;
+    const types = [];
+    types.push({ value: "mid", label: "Mid shift" });
+    if (isOvernight) {
+      types.push({ value: "overnight", label: "Overnight" });
+    } else {
+      const isOpener = s <= o;
+      const isCloser = e >= c;
+      if (isOpener && isCloser) {
+        types.push({ value: "open-close", label: "Open to close" });
+      }
+      if (isOpener) {
+        types.push({ value: "open-mid", label: is24hr ? "Early shift" : "Opening shift" });
+      }
+      if (isCloser) {
+        types.push({ value: "mid-close", label: "Closing shift" });
+      }
+    }
+    return types;
+  };
+
+  // Validation
+  const overnightWithout24hr = role === "overnight" && !is24hrToggle;
+  const shiftTimeSame = +shiftStart === +shiftEnd;
+  const shiftValid = !shiftTimeSame && !overnightWithout24hr;
+
+  // Ensure current shiftType is in valid list, otherwise auto-correct
+  const validTypes = getValidShiftTypes();
+  useEffect(() => {
+    if (shiftValid && !validTypes.find((t) => t.value === shiftType)) {
+      const inferred = inferShiftType(shiftStart, shiftEnd, storeOpen, storeClose);
+      if (inferred !== shiftType) setShiftType(inferred);
+    }
+  }, [shiftValid, shiftType, shiftStart, shiftEnd, storeOpen, storeClose]);
+
   const setupData = {
     role,
     shiftType,
@@ -1275,49 +1328,6 @@ function StartDayScreen({ onComplete }) {
     );
   }
 
-  // 24-hour pharmacy detection
-  const is24hr = is24hrToggle;
-
-  // Determine which shift types are valid given current times
-  const getValidShiftTypes = () => {
-    const s = +shiftStart, e = +shiftEnd, o = +storeOpen, c = +storeClose;
-    const isOvernight = e < s;
-    const types = [];
-
-    // Mid shift — always available
-    types.push({ value: "mid", label: "Mid shift" });
-
-    if (isOvernight) {
-      types.push({ value: "overnight", label: "Overnight" });
-    } else {
-      const isOpener = s <= o;
-      const isCloser = e >= c;
-      if (isOpener && isCloser) {
-        types.push({ value: "open-close", label: "Open to close" });
-      }
-      if (isOpener) {
-        types.push({ value: "open-mid", label: is24hr ? "Early shift" : "Opening shift" });
-      }
-      if (isCloser) {
-        types.push({ value: "mid-close", label: "Closing shift" });
-      }
-    }
-
-    return types;
-  };
-
-  // Auto-infer the best shift type from times
-  const inferShiftType = (start, end, open, close) => {
-    const s = +start, e = +end, o = +open, c = +close;
-    if (e < s) return "overnight";
-    const isOpener = s <= o; // you're there when the pharmacy opens
-    const isCloser = e >= c; // you're there when the pharmacy closes
-    if (isOpener && isCloser) return "open-close";
-    if (isOpener) return "open-mid";
-    if (isCloser) return "mid-close";
-    return "mid";
-  };
-
   // Generate shift time options constrained to pharmacy hours (± 1hr)
   const getShiftTimeOptions = () => {
     if (is24hr) return TIME_OPTIONS; // 24hr store — all times valid
@@ -1349,22 +1359,9 @@ function StartDayScreen({ onComplete }) {
     setShiftType(inferShiftType(shiftStart, val, storeOpen, storeClose));
   };
 
-  // Validation
-  const overnightWithout24hr = role === "overnight" && !is24hrToggle;
-  const shiftTimeSame = +shiftStart === +shiftEnd;
-  const shiftValid = !shiftTimeSame && !overnightWithout24hr;
   const shiftError = shiftTimeSame ? "Shift start and end can't be the same time."
     : overnightWithout24hr ? "Overnight pharmacist requires a 24-hour pharmacy."
     : null;
-
-  // Ensure current shiftType is in valid list, otherwise auto-correct
-  const validTypes = getValidShiftTypes();
-  useEffect(() => {
-    if (shiftValid && !validTypes.find((t) => t.value === shiftType)) {
-      const inferred = inferShiftType(shiftStart, shiftEnd, storeOpen, storeClose);
-      if (inferred !== shiftType) setShiftType(inferred);
-    }
-  }, [shiftValid, shiftType, shiftStart, shiftEnd, storeOpen, storeClose]);
 
   const stepTitles = ["Your shift", "Coverage & events", "Goals & notes"];
 
