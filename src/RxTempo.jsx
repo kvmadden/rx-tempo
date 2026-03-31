@@ -23,7 +23,7 @@ const RULES = [
     category: "opening",
     itemType: "check",
     usualWindow: { startOffset: 0, endOffset: 20 },
-    roleContext: "Smooth first impression for the day.",
+    roleContext: "First patient walks in — are we ready for them?",
     carryLogic: "suppress",
     handoffEligibility: null,
     getAheadEligible: false,
@@ -33,6 +33,7 @@ const RULES = [
     id: "open-willcall",
     label: "Will call check",
     description: "Patients get frustrated when their script isn't where it should be. A quick scan now catches misfiled bags and expiring holds before they become pickup problems.",
+    personFacing: true,
     category: "opening",
     itemType: "check",
     usualWindow: { startOffset: 5, endOffset: 60 },
@@ -49,7 +50,7 @@ const RULES = [
     category: "opening",
     itemType: "check",
     usualWindow: { startOffset: 0, endOffset: 90 },
-    roleContext: "Keeps inventory gaps from reaching patients.",
+    roleContext: "A patient might need what's in that shipment.",
     carryLogic: "carry",
     handoffEligibility: null,
     getAheadEligible: false,
@@ -73,6 +74,7 @@ const RULES = [
     id: "mid-queue",
     label: "Queue and production check",
     description: "A stuck claim or missing part can snowball into a long wait at pickup. Catching it now keeps the line moving and patients happy.",
+    personFacing: true,
     category: "midday",
     itemType: "check",
     usualWindow: { startOffset: 120, endOffset: 240 },
@@ -86,6 +88,7 @@ const RULES = [
     id: "mid-immunizations",
     label: "Immunization appointment prep",
     description: "Patients scheduled around this — check for gaps in the appointment book and make sure supplies are drawn and ready before they arrive.",
+    personFacing: true,
     category: "midday",
     itemType: "task",
     usualWindow: { startOffset: 120, endOffset: 300 },
@@ -112,6 +115,7 @@ const RULES = [
     id: "mid-mtm",
     label: "Patient care outreach",
     description: "MTM opportunities, med sync check-ins, and therapy follow-ups. A quick conversation now can genuinely improve outcomes and keep clinical metrics healthy.",
+    personFacing: true,
     category: "midday",
     itemType: "task",
     usualWindow: { startOffset: 120, endOffset: 360 },
@@ -192,6 +196,7 @@ const RULES = [
     id: "exit-queue-state",
     label: "Queue state at handoff",
     description: "The person coming in next can't see what you saw today. A quick heads-up on queue depth saves them from walking in blind.",
+    personFacing: true,
     category: "exit",
     itemType: "check",
     usualWindow: { startOffset: -30, endOffset: 0 },
@@ -205,6 +210,7 @@ const RULES = [
     id: "exit-open-issues",
     label: "Unresolved issues to mention",
     description: "An unmentioned callback or pending prior auth can leave a patient hanging. A 60-second verbal handoff closes the loop and builds team trust.",
+    personFacing: true,
     category: "exit",
     itemType: "task",
     usualWindow: { startOffset: -30, endOffset: 0 },
@@ -259,10 +265,11 @@ const RULES = [
     id: "mid-voicemail",
     label: "Pharmacy voicemail",
     description: "A prescriber callback sitting in voicemail can delay a patient's fill for hours. Clearing the queue keeps things moving for everyone.",
+    personFacing: true,
     category: "midday",
     itemType: "check",
     usualWindow: { startOffset: 90, endOffset: 240 },
-    roleContext: "Unanswered calls delay patient care.",
+    roleContext: "Someone called us because they need us.",
     carryLogic: "carry",
     handoffEligibility: "exit",
     getAheadEligible: false,
@@ -272,10 +279,11 @@ const RULES = [
     id: "mid-readyfill",
     label: "ReadyFill drop review",
     description: "Check the auto-fills that dropped in — verify pricing looks right, insurance billed correctly, and nothing needs intervention before patients show up expecting it ready.",
+    personFacing: true,
     category: "midday",
     itemType: "task",
     usualWindow: { startOffset: 150, endOffset: 300 },
-    roleContext: "Pricing, insurance, intervention — catch it before pickup.",
+    roleContext: "Someone's expecting this to be ready when they get here.",
     carryLogic: "carry",
     handoffEligibility: null,
     getAheadEligible: false,
@@ -290,16 +298,35 @@ const NUDGES = [
   {
     id: "nudge-waiters",
     label: "Anyone waiting on us?",
-    detail: "Quick glance at the waiting area — make sure nobody's been sitting there forgotten.",
-    intervalMin: 45, // resurface every ~45 minutes
-    activeAfterOffset: 30, // don't show in the first 30 min of shift
+    details: [
+      "Quick glance at the waiting area — make sure nobody's been sitting there forgotten.",
+      "Somebody might be out there wondering if we forgot about them.",
+      "Even a quick 'we haven't forgotten you' goes a long way.",
+    ],
+    intervalMin: 45,
+    activeAfterOffset: 30,
   },
   {
     id: "nudge-callbacks",
     label: "Do we owe anyone a call?",
-    detail: "Quick scan of the callback list — insurance questions, special orders, prior auth updates.",
+    details: [
+      "Quick scan of the callback list — insurance questions, special orders, prior auth updates.",
+      "Someone might be sitting by the phone waiting to hear from us.",
+      "A quick call now saves someone a worried evening.",
+    ],
     intervalMin: 60,
     activeAfterOffset: 90,
+  },
+  {
+    id: "nudge-team",
+    label: "How's your team doing?",
+    details: [
+      "Quick check-in — is anyone buried or stuck? Sometimes people don't ask for help.",
+      "Your colleagues are people too. A 'you good?' goes a long way.",
+      "Busy days are when people quietly struggle. A quick check-in matters.",
+    ],
+    intervalMin: 90,
+    activeAfterOffset: 60,
   },
 ];
 
@@ -526,14 +553,14 @@ function computeItemStates(rules, prevStates, setup, ctx, queueState, checkConfi
       }
     }
 
-    // High demand: suppress low-risk items entirely
-    if (q === "highdemand" && rule.riskWeight === "low") {
+    // High demand: suppress low-risk items entirely (exempt person-facing)
+    if (q === "highdemand" && rule.riskWeight === "low" && !rule.personFacing) {
       result[rule.id] = S.HIDDEN;
       continue;
     }
 
-    // Needs focus: suppress low-risk non-compliance items that aren't already visible
-    if (!isComplianceItem(rule) && q === "needsfocus" && rule.riskWeight === "low" && prev !== S.VISIBLE && prev !== S.VISIBLE_HANDOFF) {
+    // Needs focus: suppress low-risk non-compliance items that aren't already visible (exempt person-facing)
+    if (!isComplianceItem(rule) && !rule.personFacing && q === "needsfocus" && rule.riskWeight === "low" && prev !== S.VISIBLE && prev !== S.VISIBLE_HANDOFF) {
       result[rule.id] = S.HIDDEN;
       continue;
     }
@@ -546,7 +573,7 @@ function computeItemStates(rules, prevStates, setup, ctx, queueState, checkConfi
 
     if (inWin) {
       // Hard cap: don't surface more than MAX_VISIBLE low-risk items (high-risk + compliance exempt)
-      if (visibleCount >= MAX_VISIBLE && rule.riskWeight === "low" && !isComplianceItem(rule)) {
+      if (visibleCount >= MAX_VISIBLE && rule.riskWeight === "low" && !isComplianceItem(rule) && !rule.personFacing) {
         result[rule.id] = S.HIDDEN;
         continue;
       }
@@ -582,8 +609,8 @@ function getPacingLine(ctx, { visibleCount = 0, coverageMode = "solo", queueStat
 
   // High demand override — protective
   if (q === "highdemand") {
-    if (visibleCount === 0) return "High demand. Focus on one patient at a time.";
-    return "High demand. Showing only what's essential.";
+    if (visibleCount === 0) return "High demand. Focus on the person in front of you.";
+    return "High demand. People-connected items stay visible.";
   }
 
   // Milestone checks — these feel good
@@ -601,7 +628,7 @@ function getPacingLine(ctx, { visibleCount = 0, coverageMode = "solo", queueStat
     if (ctx.exitWindow) return "Almost done. Nothing left to surface.";
     if (ctx.timingPressure === "end-of-day") return "Wrapping up. Nothing left to surface.";
     if (ctx.timingPressure === "tightening") return "Window is tightening, but you're clear.";
-    if (q === "clear") return "All clear. Good time for conversations or getting ahead.";
+    if (q === "clear") return "All clear. Good time for conversations or catching up with someone.";
     return "Nothing pressing right now. Steady window.";
   }
   if (visibleCount === 1) {
@@ -668,6 +695,7 @@ const THEMES = {
     navBg: "rgba(15,17,20,0.95)",
     selectBg: "#181A1F",
     selectText: "#E6EDF3",
+    personWarm: "rgba(255,183,77,0.08)",
   },
   light: {
     bg: "#EEEEF2",
@@ -694,6 +722,7 @@ const THEMES = {
     navBg: "rgba(238,238,242,0.95)",
     selectBg: "#F6F6F8",
     selectText: "#1C1E21",
+    personWarm: "rgba(255,152,0,0.06)",
   },
 };
 
@@ -1820,13 +1849,14 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
     if (eligible.length === 0) { setActiveNudge(null); return; }
     // Pick the one dismissed longest ago (or never dismissed)
     const pick = eligible.sort((a, b) => (nudgeDismissedAt[a.id] ?? -9999) - (nudgeDismissedAt[b.id] ?? -9999))[0];
-    if (!activeNudge || activeNudge.id !== pick.id) setActiveNudge(pick);
-    // Auto-dismiss after 20 seconds
+    const detail = pick.details[Math.floor(Math.random() * pick.details.length)];
+    if (!activeNudge || activeNudge.id !== pick.id) setActiveNudge({ ...pick, detail });
+    // Auto-dismiss after 30 seconds
     if (nudgeTimerRef.current) clearTimeout(nudgeTimerRef.current);
     nudgeTimerRef.current = setTimeout(() => {
       setActiveNudge(null);
       setNudgeDismissedAt((prev) => ({ ...prev, [pick.id]: ctx.currentMin }));
-    }, 20000);
+    }, 30000);
     return () => { if (nudgeTimerRef.current) clearTimeout(nudgeTimerRef.current); };
   }, [ctx?.currentMin, ctx?.shiftProgress, queueState, nudgeDismissedAt]);
 
@@ -1845,7 +1875,9 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
         const bType = (TYPE_RANK[b.itemType] ?? 1);
         if (aType !== bType) return aType - bType;
       }
-      return (WEIGHT_RANK[a.riskWeight] || 2) - (WEIGHT_RANK[b.riskWeight] || 2);
+      const aw = (WEIGHT_RANK[a.riskWeight] || 2) - (WEIGHT_RANK[b.riskWeight] || 2);
+      if (aw !== 0) return aw;
+      return (a.personFacing ? 0 : 1) - (b.personFacing ? 0 : 1);
     });
     const conf = rules.filter((r) =>
       [S.CONFIRMED, S.HANDLED_EARLY].includes(itemStates[r.id])
@@ -1892,6 +1924,12 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
 
   // Items whose window has passed without being actioned
   const stillOpen = getStillOpenItems(rules, itemStates, setup, ctx);
+  const stillOpenHasPersonFacing = stillOpen.some((r) => r.personFacing);
+
+  // Auto-expand still-open section when person-facing items are present
+  useEffect(() => {
+    if (stillOpenHasPersonFacing) setShowStillOpen(true);
+  }, [stillOpenHasPersonFacing]);
 
   const visibleChecks = visible.filter(isCheckItem).length;
   const visibleTasks = visible.length - visibleChecks;
@@ -2102,7 +2140,7 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
             if (isCheck && !isAttention) {
               return (
                 <div key={r.id} style={{
-                  background: isConfirming ? MF.greenDim : MF.card,
+                  background: isConfirming ? MF.greenDim : r.personFacing ? MF.personWarm : MF.card,
                   border: `1px solid ${isConfirming ? MF.green + "60" : MF.border}`,
                   ...confirmTransition(isConfirming),
                   borderRadius: MF.radiusSm,
@@ -2153,7 +2191,7 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
               const isSkipConfirming = confirmSkipCompliance === r.id;
               return (
                 <div key={r.id} style={{
-                  background: isConfirming ? MF.greenDim : MF.card,
+                  background: isConfirming ? MF.greenDim : r.personFacing ? MF.personWarm : MF.card,
                   border: `1px solid ${isConfirming ? MF.green + "60" : MF.compliance + "40"}`,
                   borderLeft: `3px solid ${isConfirming ? MF.green : MF.compliance}`,
                   ...confirmTransition(isConfirming),
@@ -2248,7 +2286,7 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
 
             return (
               <div key={r.id} style={{
-                background: isConfirming ? MF.greenDim : isEscalated ? MF.amberDim : MF.card,
+                background: isConfirming ? MF.greenDim : isEscalated ? MF.amberDim : r.personFacing ? MF.personWarm : MF.card,
                 border: `1px solid ${isConfirming ? MF.green + "60" : isEscalated ? MF.amber + "4D" : MF.border}`,
                 borderLeft: `3px solid ${isConfirming ? MF.green : leftBorder}`,
                 ...confirmTransition(isConfirming),
@@ -2397,7 +2435,7 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
                 background: showStillOpen ? MF.amberDim : "transparent",
                 color: MF.amber,
               }}>
-                {stillOpen.length} remaining
+                {stillOpen.length} still need attention
               </button>
             )}
             {confirmed.length > 0 && (
@@ -2702,12 +2740,12 @@ function getHandoffScenario(setup) {
   if (isSolo) {
     exitType = "solo-close";
     exitLabel = "Closing out";
-    exitHeadline = (n) => n === 0 ? "Everything resolved. Good close." : `${n} things to resolve before you lock up.`;
+    exitHeadline = (n) => n === 0 ? "Everyone's taken care of. Good close." : `${n} thing${n === 1 ? "" : "s"} to wrap up before you lock up.`;
     exitClean = (covered) => covered > 0 ? `${covered} items covered. Clean close.` : "All set. Clean close.";
   } else if (isOpener && hasOverlap && !isCloser) {
     exitType = "opener-handing-off";
     exitLabel = "Handing off";
-    exitHeadline = (n) => n === 0 ? "Clean handoff. Nothing unresolved." : `${n} things worth mentioning.`;
+    exitHeadline = (n) => n === 0 ? "Clean handoff. Everyone's covered." : `${n} thing${n === 1 ? "" : "s"} worth mentioning.`;
     exitClean = (covered) => covered > 0 ? `${covered} items covered. Thanks for setting the pace.` : "All set. Thanks for setting the pace.";
   } else if (isMid) {
     exitType = "mid-handing-off";
@@ -2717,7 +2755,7 @@ function getHandoffScenario(setup) {
   } else if (isCloser && hasOverlap && !isOpener) {
     exitType = "closer-wrapping";
     exitLabel = "Closing out";
-    exitHeadline = (n) => n === 0 ? "Everything resolved. Good close." : `${n} things to resolve before close.`;
+    exitHeadline = (n) => n === 0 ? "Everyone's taken care of. Good close." : `${n} thing${n === 1 ? "" : "s"} to wrap up before close.`;
     exitClean = (covered) => covered > 0 ? `${covered} items covered. Thanks for a solid close.` : "All clear. Good close.";
   } else if (isOvernight) {
     exitType = "overnight-handing-off";
@@ -2727,7 +2765,7 @@ function getHandoffScenario(setup) {
   } else {
     exitType = "generic";
     exitLabel = "Handing off";
-    exitHeadline = (n) => n === 0 ? "Clean handoff. Nothing unresolved." : `${n} things worth mentioning.`;
+    exitHeadline = (n) => n === 0 ? "Clean handoff. Everyone's covered." : `${n} thing${n === 1 ? "" : "s"} worth mentioning.`;
     exitClean = (covered) => covered > 0 ? `${covered} items covered. Thanks for a solid shift.` : "All set. Thanks for keeping things steady.";
   }
 
@@ -2846,7 +2884,7 @@ function ArrivalScreen({ rules, itemStates, ctx, onAction, setup }) {
             const isConfirming = justConfirmed === r.id;
             return (
               <div key={r.id} style={{
-                background: isConfirming ? MF.greenDim : MF.card,
+                background: isConfirming ? MF.greenDim : r.personFacing ? MF.personWarm : MF.card,
                 border: `1px solid ${isConfirming ? MF.green + "60" : isAttention ? MF.amber + "4D" : isComp ? MF.compliance + "40" : MF.border}`,
                 borderLeft: `3px solid ${isConfirming ? MF.green : isAttention ? MF.amber : isComp ? MF.compliance : MF.accentMid}`,
                 borderRadius: MF.radius, overflow: "hidden",
@@ -2953,7 +2991,7 @@ function LaterTodayScreen({ rules, itemStates, setup, ctx, onAction }) {
             const isConfirming = justConfirmed === r.id;
             return (
               <div key={r.id} style={{
-                background: isConfirming ? MF.greenDim : MF.card,
+                background: isConfirming ? MF.greenDim : r.personFacing ? MF.personWarm : MF.card,
                 border: `1px solid ${isConfirming ? MF.green + "60" : isComp ? MF.compliance + "40" : MF.border}`,
                 borderLeft: isComp ? `3px solid ${isConfirming ? MF.green : MF.compliance}` : undefined,
                 borderRadius: MF.radius, overflow: "hidden",
@@ -3061,13 +3099,13 @@ function GetAheadScreen({ rules, itemStates, ctx, onAction, queueState }) {
         <span>{fmtTime12(ctx.currentMin)}</span>
       </div>
       <div style={{ fontSize: "15px", fontWeight: 600, color: MF.text, letterSpacing: "-0.01em", marginBottom: "12px" }}>
-        {toobusy ? "Plenty on your plate" : eligible.length === 0 ? "Nothing to get ahead on" : `${eligible.length} optional opportunit${eligible.length === 1 ? "y" : "ies"}`}
+        {toobusy ? "Focus on who's in front of you" : eligible.length === 0 ? "Nothing to get ahead on" : `${eligible.length} thing${eligible.length === 1 ? "" : "s"} you could get to`}
       </div>
 
       {toobusy ? (
         <QuietState
-          message="Plenty on your plate already."
-          sub="Focus on what's in front of you first."
+          message="Focus on who's in front of you."
+          sub="These can wait — people can't."
         />
       ) : eligible.length === 0 ? (
         <QuietState message="Nothing to get ahead on right now." sub="You're in a good spot." />
@@ -3078,7 +3116,7 @@ function GetAheadScreen({ rules, itemStates, ctx, onAction, queueState }) {
             const isConfirming = justConfirmed === r.id;
             return (
               <div key={r.id} style={{
-                background: isConfirming ? MF.greenDim : MF.card,
+                background: isConfirming ? MF.greenDim : r.personFacing ? MF.personWarm : MF.card,
                 border: `1px solid ${isConfirming ? MF.green + "60" : MF.border}`,
                 borderRadius: MF.radius, overflow: "hidden",
                 animation: "slideUp 0.25s ease both",
@@ -3245,7 +3283,7 @@ function ExitScreen({ rules, itemStates, ctx, setup, onAction, vaccineCount }) {
             const isConfirming = justConfirmed === r.id;
             return (
               <div key={r.id} style={{
-                background: isConfirming ? MF.greenDim : MF.card,
+                background: isConfirming ? MF.greenDim : r.personFacing ? MF.personWarm : MF.card,
                 border: `1px solid ${isConfirming ? MF.green + "60" : isAttention ? MF.amber + "4D" : isComp ? MF.compliance + "40" : MF.border}`,
                 borderLeft: `3px solid ${isConfirming ? MF.green : isAttention ? MF.amber : isComp ? MF.compliance : MF.accentMid}`,
                 borderRadius: MF.radius, overflow: "hidden",
@@ -3624,6 +3662,7 @@ function RxTempoApp() {
         id: "event-warehouse",
         label: "Warehouse delivery check-in",
         description: "Totes are here. Check in order, verify counts, flag shortages or damages.",
+        personFacing: true,
         category: "midday",
         itemType: "task",
         usualWindow: { startOffset: offset, endOffset: offset + 120 },
@@ -3642,6 +3681,7 @@ function RxTempoApp() {
         id: "event-ov",
         label: "OV order check-in",
         description: "Outside vendor delivery is here. Check in order and verify against PO.",
+        personFacing: true,
         category: "midday",
         itemType: "task",
         usualWindow: { startOffset: offset, endOffset: offset + 90 },
@@ -3660,6 +3700,7 @@ function RxTempoApp() {
         id: "event-usps",
         label: "USPS pickup — now",
         description: "USPS driver is here. Get all outgoing shipments to pick-n-pack now.",
+        personFacing: true,
         category: "deadline",
         itemType: "task",
         usualWindow: { startOffset: offset, endOffset: offset + 20 },
@@ -3677,6 +3718,7 @@ function RxTempoApp() {
         id: "event-usps-prep",
         label: "USPS pickup prep",
         description: "USPS pickup expected today. Make sure outgoing shipments are ready in pick-n-pack.",
+        personFacing: true,
         category: "midday",
         itemType: "check",
         usualWindow: { startOffset: 180, endOffset: -30 },
