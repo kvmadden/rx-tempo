@@ -1809,10 +1809,7 @@ function HomeScreen({ rules, itemStates, ctx, setup, onAction, onNav, eventArriv
   const nudgeTimerRef = useRef(null);
 
   useEffect(() => {
-    if (!ctx || queueState === "highdemand" || queueState === "needsfocus") {
-      setActiveNudge(null);
-      return;
-    }
+    if (!ctx) { setActiveNudge(null); return; }
     const minutesIn = ctx.shiftProgress != null ? ctx.shiftProgress * ((ctx.shiftEnd - ctx.shiftStart + 1440) % 1440 || 480) : 0;
     const eligible = NUDGES.filter((n) => {
       if (minutesIn < n.activeAfterOffset) return false;
